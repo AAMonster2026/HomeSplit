@@ -1,0 +1,2389 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="HomeSplit — 家庭收支分帳平台，資料可同步至 GitHub 專案中的 JSON／XML" />
+  <meta name="theme-color" content="#0d9488" />
+  <title>HomeSplit — 家庭收支</title>
+  <style>
+    /* =========================================================
+       HomeSplit — 家庭收支平台（單一 HTML 檔）
+       風格參考 KittySplit：乾淨、現代、卡片式、淺色系
+       ========================================================= */
+
+    /* ---------- CSS 變數（主題可調） ---------- */
+    :root {
+      --bg: #f3f6f8;
+      --bg-elevated: #ffffff;
+      --bg-muted: #eef2f5;
+      --bg-soft: #f8fafb;
+      --text: #1a2b34;
+      --text-secondary: #5a6f7a;
+      --text-muted: #8a9ba5;
+      --border: #e2e8ed;
+      --border-strong: #cfd8de;
+      --primary: #0d9488;
+      --primary-hover: #0f766e;
+      --primary-soft: #ccfbf1;
+      --primary-text: #0f766e;
+      --accent: #0891b2;
+      --danger: #dc2626;
+      --danger-soft: #fee2e2;
+      --warning: #d97706;
+      --warning-soft: #fef3c7;
+      --success: #059669;
+      --success-soft: #d1fae5;
+      --shadow-sm: 0 1px 2px rgba(26, 43, 52, 0.05);
+      --shadow: 0 4px 16px rgba(26, 43, 52, 0.06);
+      --shadow-lg: 0 12px 40px rgba(26, 43, 52, 0.1);
+      --radius: 14px;
+      --radius-sm: 10px;
+      --radius-xs: 8px;
+      --font: "Segoe UI", "PingFang TC", "Noto Sans TC", "Microsoft JhengHei", sans-serif;
+      --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+      --max-w: 1100px;
+      --header-h: 64px;
+      --transition: 0.18s ease;
+    }
+
+    /* 深色模式 */
+    [data-theme="dark"] {
+      --bg: #0f171b;
+      --bg-elevated: #1a242a;
+      --bg-muted: #243039;
+      --bg-soft: #152028;
+      --text: #e8eef2;
+      --text-secondary: #a8b8c2;
+      --text-muted: #7a8d98;
+      --border: #2d3b44;
+      --border-strong: #3d4f5a;
+      --primary: #2dd4bf;
+      --primary-hover: #5eead4;
+      --primary-soft: #134e4a;
+      --primary-text: #5eead4;
+      --accent: #22d3ee;
+      --danger: #f87171;
+      --danger-soft: #450a0a;
+      --warning: #fbbf24;
+      --warning-soft: #451a03;
+      --success: #34d399;
+      --success-soft: #064e3b;
+      --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+      --shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+      --shadow-lg: 0 12px 40px rgba(0, 0, 0, 0.45);
+    }
+
+    /* ---------- Reset / Base ---------- */
+    *, *::before, *::after { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      font-family: var(--font);
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+      min-height: 100vh;
+      -webkit-font-smoothing: antialiased;
+    }
+    button, input, select, textarea { font: inherit; color: inherit; }
+    button { cursor: pointer; border: none; background: none; }
+    a { color: var(--primary); }
+    img { max-width: 100%; }
+    :focus-visible {
+      outline: 2px solid var(--primary);
+      outline-offset: 2px;
+    }
+    .sr-only {
+      position: absolute; width: 1px; height: 1px;
+      padding: 0; margin: -1px; overflow: hidden;
+      clip: rect(0,0,0,0); white-space: nowrap; border: 0;
+    }
+
+    /* ---------- Layout ---------- */
+    .app-header {
+      position: sticky; top: 0; z-index: 50;
+      height: var(--header-h);
+      background: color-mix(in srgb, var(--bg-elevated) 92%, transparent);
+      backdrop-filter: blur(10px);
+      border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 1.25rem; gap: 1rem;
+    }
+    .brand {
+      display: flex; align-items: center; gap: 0.65rem;
+      font-weight: 700; font-size: 1.15rem; letter-spacing: -0.02em;
+    }
+    .brand-mark {
+      width: 34px; height: 34px; border-radius: 10px;
+      background: linear-gradient(135deg, var(--primary), var(--accent));
+      display: grid; place-items: center; color: #fff; font-size: 0.95rem;
+      box-shadow: var(--shadow-sm);
+      flex-shrink: 0;
+    }
+    .header-actions { display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; justify-content: flex-end; }
+
+    .container {
+      width: min(100% - 2rem, var(--max-w));
+      margin: 0 auto;
+      padding: 1.5rem 0 3rem;
+    }
+
+    /* ---------- Buttons ---------- */
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center; gap: 0.4rem;
+      padding: 0.55rem 1rem;
+      border-radius: var(--radius-xs);
+      font-weight: 600; font-size: 0.925rem;
+      transition: background var(--transition), color var(--transition),
+                  border-color var(--transition), transform 0.1s ease, box-shadow var(--transition);
+      white-space: nowrap;
+    }
+    .btn:active { transform: translateY(1px); }
+    .btn-primary {
+      background: var(--primary); color: #fff;
+      box-shadow: 0 2px 8px color-mix(in srgb, var(--primary) 35%, transparent);
+    }
+    .btn-primary:hover { background: var(--primary-hover); }
+    .btn-secondary {
+      background: var(--bg-elevated); color: var(--text);
+      border: 1px solid var(--border-strong);
+    }
+    .btn-secondary:hover { background: var(--bg-muted); }
+    .btn-ghost {
+      background: transparent; color: var(--text-secondary);
+      padding: 0.45rem 0.7rem;
+    }
+    .btn-ghost:hover { background: var(--bg-muted); color: var(--text); }
+    .btn-danger { background: var(--danger); color: #fff; }
+    .btn-danger:hover { filter: brightness(1.05); }
+    .btn-danger-soft {
+      background: var(--danger-soft); color: var(--danger);
+    }
+    .btn-danger-soft:hover { filter: brightness(0.97); }
+    .btn-lg { padding: 0.8rem 1.4rem; font-size: 1rem; border-radius: var(--radius-sm); }
+    .btn-sm { padding: 0.35rem 0.65rem; font-size: 0.8rem; }
+    .btn-block { width: 100%; }
+    .btn-icon {
+      width: 36px; height: 36px; padding: 0;
+      border-radius: var(--radius-xs);
+      display: inline-grid; place-items: center;
+      color: var(--text-secondary);
+    }
+    .btn-icon:hover { background: var(--bg-muted); color: var(--text); }
+
+    /* ---------- Cards / Surfaces ---------- */
+    .card {
+      background: var(--bg-elevated);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow-sm);
+      padding: 1.25rem;
+    }
+    .card + .card { margin-top: 1rem; }
+    .card-title {
+      margin: 0 0 0.35rem;
+      font-size: 1.05rem; font-weight: 700;
+      letter-spacing: -0.01em;
+    }
+    .card-sub {
+      margin: 0 0 1rem;
+      color: var(--text-secondary); font-size: 0.9rem;
+    }
+    .section-label {
+      font-size: 0.75rem; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.06em;
+      color: var(--text-muted); margin-bottom: 0.65rem;
+    }
+
+    /* ---------- Forms ---------- */
+    .form-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 0.9rem;
+    }
+    .form-grid.cols-3 { grid-template-columns: repeat(3, 1fr); }
+    .form-grid.cols-4 { grid-template-columns: repeat(4, 1fr); }
+    .field { display: flex; flex-direction: column; gap: 0.35rem; }
+    .field.span-2 { grid-column: span 2; }
+    .field.span-full { grid-column: 1 / -1; }
+    label {
+      font-size: 0.82rem; font-weight: 600;
+      color: var(--text-secondary);
+    }
+    .input, .select, .textarea {
+      width: 100%;
+      padding: 0.65rem 0.8rem;
+      border: 1px solid var(--border-strong);
+      border-radius: var(--radius-xs);
+      background: var(--bg-soft);
+      transition: border-color var(--transition), box-shadow var(--transition), background var(--transition);
+    }
+    .input:hover, .select:hover, .textarea:hover {
+      border-color: color-mix(in srgb, var(--primary) 40%, var(--border-strong));
+    }
+    .input:focus, .select:focus, .textarea:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 22%, transparent);
+      background: var(--bg-elevated);
+    }
+    .textarea { resize: vertical; min-height: 72px; }
+    .hint { font-size: 0.78rem; color: var(--text-muted); }
+
+    /* ---------- Screens ---------- */
+    .screen { display: none; animation: fadeIn 0.25s ease; }
+    .screen.active { display: block; }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: none; }
+    }
+
+    /* ---------- Welcome / Setup ---------- */
+    .hero-setup {
+      min-height: calc(100vh - var(--header-h));
+      display: grid; place-items: center;
+      padding: 2rem 1rem;
+      background:
+        radial-gradient(ellipse 80% 50% at 50% -20%, color-mix(in srgb, var(--primary) 18%, transparent), transparent),
+        var(--bg);
+    }
+    .setup-card {
+      width: min(100%, 520px);
+      padding: 2rem;
+      box-shadow: var(--shadow-lg);
+    }
+    .setup-card h1 {
+      margin: 0 0 0.4rem;
+      font-size: 1.75rem; letter-spacing: -0.03em;
+    }
+    .setup-card .lead {
+      margin: 0 0 1.5rem;
+      color: var(--text-secondary);
+    }
+    .participant-row {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 0.9rem;
+    }
+
+    /* ---------- Dashboard ---------- */
+    .dash-top {
+      display: flex; flex-wrap: wrap;
+      align-items: flex-start; justify-content: space-between;
+      gap: 1rem; margin-bottom: 1.25rem;
+    }
+    .kitty-title { margin: 0; font-size: 1.65rem; letter-spacing: -0.03em; }
+    .kitty-meta {
+      display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.45rem;
+      color: var(--text-secondary); font-size: 0.9rem;
+    }
+    .pill {
+      display: inline-flex; align-items: center; gap: 0.3rem;
+      padding: 0.2rem 0.65rem;
+      border-radius: 999px;
+      background: var(--bg-muted);
+      border: 1px solid var(--border);
+      font-size: 0.8rem; font-weight: 600;
+      color: var(--text-secondary);
+    }
+    .pill.primary {
+      background: var(--primary-soft);
+      border-color: color-mix(in srgb, var(--primary) 30%, transparent);
+      color: var(--primary-text);
+    }
+
+    .dash-grid {
+      display: grid;
+      grid-template-columns: 1.55fr 1fr;
+      gap: 1.15rem;
+      align-items: start;
+    }
+    .stack { display: flex; flex-direction: column; gap: 1rem; }
+
+    /* Summary stats */
+    .stat-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 0.75rem;
+    }
+    .stat {
+      background: var(--bg-soft);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 0.9rem;
+    }
+    .stat-label { font-size: 0.78rem; color: var(--text-muted); font-weight: 600; }
+    .stat-value {
+      margin-top: 0.25rem;
+      font-size: 1.2rem; font-weight: 700;
+      font-variant-numeric: tabular-nums;
+      letter-spacing: -0.02em;
+    }
+    .stat-value.positive { color: var(--success); }
+    .stat-value.negative { color: var(--danger); }
+    .stat.highlight {
+      grid-column: 1 / -1;
+      background: linear-gradient(135deg,
+        color-mix(in srgb, var(--primary) 12%, var(--bg-elevated)),
+        color-mix(in srgb, var(--accent) 8%, var(--bg-elevated)));
+      border-color: color-mix(in srgb, var(--primary) 25%, var(--border));
+    }
+    .stat.highlight .stat-value { font-size: 1.35rem; color: var(--primary-text); }
+
+    .category-bars { display: flex; flex-direction: column; gap: 0.65rem; }
+    .cat-row { display: grid; grid-template-columns: 72px 1fr auto; gap: 0.55rem; align-items: center; }
+    .cat-name { font-size: 0.82rem; font-weight: 600; color: var(--text-secondary); }
+    .cat-bar {
+      height: 8px; border-radius: 999px;
+      background: var(--bg-muted); overflow: hidden;
+    }
+    .cat-bar > span {
+      display: block; height: 100%; border-radius: inherit;
+      background: var(--primary);
+      transition: width 0.35s ease;
+    }
+    .cat-bar[data-cat="膳食"] > span { background: #f59e0b; }
+    .cat-bar[data-cat="日常用品"] > span { background: #3b82f6; }
+    .cat-bar[data-cat="月費"] > span { background: #8b5cf6; }
+    .cat-bar[data-cat="其他"] > span { background: #64748b; }
+    .cat-amt { font-size: 0.82rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+
+    /* Expense list */
+    .expense-list { display: flex; flex-direction: column; gap: 0.55rem; }
+    .expense-item {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 0.5rem 0.75rem;
+      padding: 0.85rem 0.95rem;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      background: var(--bg-soft);
+      transition: border-color var(--transition), box-shadow var(--transition);
+    }
+    .expense-item:hover {
+      border-color: var(--border-strong);
+      box-shadow: var(--shadow-sm);
+    }
+    .expense-main { min-width: 0; }
+    .expense-top {
+      display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.4rem 0.65rem;
+    }
+    .expense-amount {
+      font-weight: 700; font-size: 1.05rem;
+      font-variant-numeric: tabular-nums;
+    }
+    .expense-desc {
+      color: var(--text); font-weight: 500;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .expense-meta {
+      margin-top: 0.25rem;
+      display: flex; flex-wrap: wrap; gap: 0.35rem 0.55rem;
+      font-size: 0.78rem; color: var(--text-muted);
+    }
+    .tag {
+      display: inline-flex; align-items: center;
+      padding: 0.1rem 0.45rem;
+      border-radius: 6px;
+      background: var(--bg-muted);
+      font-weight: 600; color: var(--text-secondary);
+    }
+    .tag.food { background: #fef3c7; color: #92400e; }
+    .tag.daily { background: #dbeafe; color: #1e40af; }
+    .tag.fee { background: #ede9fe; color: #5b21b6; }
+    .tag.other { background: #e2e8f0; color: #334155; }
+    [data-theme="dark"] .tag.food { background: #451a03; color: #fcd34d; }
+    [data-theme="dark"] .tag.daily { background: #1e3a8a; color: #93c5fd; }
+    [data-theme="dark"] .tag.fee { background: #4c1d95; color: #c4b5fd; }
+    [data-theme="dark"] .tag.other { background: #334155; color: #cbd5e1; }
+
+    .expense-actions { display: flex; gap: 0.25rem; align-items: flex-start; }
+    .empty-state {
+      text-align: center; padding: 2rem 1rem;
+      color: var(--text-muted);
+    }
+    .empty-state strong { display: block; color: var(--text-secondary); margin-bottom: 0.25rem; }
+
+    /* Settle banner */
+    .settle-panel {
+      border: 1px solid color-mix(in srgb, var(--primary) 30%, var(--border));
+      background: linear-gradient(160deg,
+        color-mix(in srgb, var(--primary) 8%, var(--bg-elevated)),
+        var(--bg-elevated));
+    }
+    .settle-result {
+      margin-top: 1rem; padding: 1rem;
+      border-radius: var(--radius-sm);
+      background: var(--success-soft);
+      border: 1px solid color-mix(in srgb, var(--success) 30%, transparent);
+    }
+    .settle-result h3 { margin: 0 0 0.4rem; color: var(--success); font-size: 1rem; }
+    .settle-result p { margin: 0.25rem 0; }
+
+    /* History */
+    .history-list { display: flex; flex-direction: column; gap: 0.55rem; }
+    .history-item {
+      display: flex; justify-content: space-between; align-items: center;
+      gap: 0.75rem; flex-wrap: wrap;
+      padding: 0.85rem 1rem;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      background: var(--bg-soft);
+    }
+    .history-item strong { display: block; }
+    .history-item span { font-size: 0.82rem; color: var(--text-muted); }
+
+    /* Modal */
+    .modal-backdrop {
+      position: fixed; inset: 0; z-index: 100;
+      background: rgba(15, 23, 27, 0.45);
+      display: none; align-items: center; justify-content: center;
+      padding: 1rem;
+      backdrop-filter: blur(3px);
+    }
+    .modal-backdrop.open { display: flex; }
+    .modal {
+      width: min(100%, 480px);
+      background: var(--bg-elevated);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow-lg);
+      padding: 1.35rem;
+      max-height: min(90vh, 720px);
+      overflow: auto;
+      animation: fadeIn 0.2s ease;
+    }
+    .modal-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 1rem; gap: 0.75rem;
+    }
+    .modal-header h2 { margin: 0; font-size: 1.15rem; }
+    .modal-actions {
+      display: flex; gap: 0.55rem; justify-content: flex-end;
+      margin-top: 1.15rem; flex-wrap: wrap;
+    }
+    .modal.wide { width: min(100%, 560px); }
+    .divider {
+      height: 1px; background: var(--border); margin: 1.1rem 0;
+      border: 0;
+    }
+    .sync-pill {
+      display: inline-flex; align-items: center; gap: 0.35rem;
+      padding: 0.28rem 0.7rem;
+      border-radius: 999px;
+      background: var(--bg-muted);
+      border: 1px solid var(--border);
+      font-size: 0.78rem; font-weight: 600;
+      color: var(--text-secondary);
+      max-width: 42vw;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .sync-pill .dot {
+      width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+      background: var(--text-muted);
+    }
+    .sync-pill.ok { color: var(--success); background: var(--success-soft); border-color: color-mix(in srgb, var(--success) 30%, transparent); }
+    .sync-pill.ok .dot { background: var(--success); }
+    .sync-pill.warn { color: var(--warning); background: var(--warning-soft); }
+    .sync-pill.warn .dot { background: var(--warning); }
+    .sync-pill.err { color: var(--danger); background: var(--danger-soft); }
+    .sync-pill.err .dot { background: var(--danger); }
+    .sync-pill.busy .dot { background: var(--accent); animation: pulse 1s infinite; }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.35; }
+    }
+    .github-hint {
+      margin: 1rem 0 0;
+      padding: 0.85rem 0.95rem;
+      border-radius: var(--radius-sm);
+      background: var(--bg-muted);
+      border: 1px solid var(--border);
+      font-size: 0.85rem;
+      color: var(--text-secondary);
+    }
+
+    /* Toast */
+    .toast-host {
+      position: fixed; bottom: 1.25rem; right: 1.25rem; z-index: 200;
+      display: flex; flex-direction: column; gap: 0.5rem;
+      pointer-events: none;
+    }
+    .toast {
+      pointer-events: auto;
+      background: var(--text); color: var(--bg);
+      padding: 0.75rem 1rem;
+      border-radius: var(--radius-xs);
+      box-shadow: var(--shadow-lg);
+      font-size: 0.9rem; font-weight: 500;
+      animation: fadeIn 0.2s ease;
+      max-width: min(90vw, 340px);
+    }
+    [data-theme="dark"] .toast {
+      background: #e8eef2; color: #0f171b;
+    }
+
+    /* Toolbar row */
+    .toolbar {
+      display: flex; flex-wrap: wrap; gap: 0.5rem;
+      align-items: center; justify-content: space-between;
+      margin-bottom: 0.85rem;
+    }
+    .toolbar-left, .toolbar-right {
+      display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center;
+    }
+
+    /* Print */
+    .print-only { display: none; }
+
+    /* Responsive */
+    @media (max-width: 860px) {
+      .dash-grid { grid-template-columns: 1fr; }
+      .form-grid, .form-grid.cols-3, .form-grid.cols-4 {
+        grid-template-columns: 1fr 1fr;
+      }
+      .field.span-2 { grid-column: span 2; }
+    }
+    @media (max-width: 560px) {
+      .container { width: min(100% - 1.25rem, var(--max-w)); padding-top: 1rem; }
+      .app-header { padding: 0 0.85rem; }
+      .brand span.brand-text { display: none; }
+      .form-grid, .form-grid.cols-3, .form-grid.cols-4,
+      .participant-row, .stat-grid {
+        grid-template-columns: 1fr;
+      }
+      .field.span-2, .field.span-full { grid-column: auto; }
+      .kitty-title { font-size: 1.35rem; }
+      .setup-card { padding: 1.35rem; }
+      .cat-row { grid-template-columns: 64px 1fr auto; }
+    }
+
+    /* Print-friendly settlement */
+    @media print {
+      body { background: #fff; color: #000; }
+      .app-header, .btn, .header-actions, .no-print,
+      .toast-host, .modal-backdrop { display: none !important; }
+      .print-only { display: block !important; }
+      .card {
+        box-shadow: none; border: 1px solid #ccc;
+        break-inside: avoid;
+      }
+      .dash-grid { grid-template-columns: 1fr; }
+      .screen { display: none !important; }
+      .screen.active, #screen-print { display: block !important; }
+    }
+  </style>
+</head>
+<body>
+  <!-- ===================== Header ===================== -->
+  <header class="app-header" role="banner">
+    <div class="brand" aria-label="HomeSplit">
+      <div class="brand-mark" aria-hidden="true">H</div>
+      <span class="brand-text">HomeSplit</span>
+    </div>
+    <div class="header-actions">
+      <span class="sync-pill" id="sync-status" title="GitHub 同步狀態">
+        <span class="dot" aria-hidden="true"></span>
+        <span id="sync-status-text">尚未同步</span>
+      </span>
+      <button type="button" class="btn-icon" id="btn-theme" title="切換淺色／深色模式" aria-label="切換淺色／深色模式">◐</button>
+      <button type="button" class="btn btn-ghost btn-sm no-print" id="btn-data">資料</button>
+      <button type="button" class="btn btn-ghost btn-sm no-print" id="btn-history" hidden>歷史</button>
+    </div>
+  </header>
+
+  <!-- ===================== Setup Screen ===================== -->
+  <main>
+    <section id="screen-setup" class="screen active" aria-labelledby="setup-heading">
+      <div class="hero-setup">
+        <div class="card setup-card">
+          <h1 id="setup-heading">建立家庭收支</h1>
+          <p class="lead">像 KittySplit 一樣簡單：兩人記帳、即時結算、資料存在本機瀏覽器。</p>
+
+          <form id="form-setup" autocomplete="on">
+            <div class="form-grid" style="margin-bottom: 0.9rem;">
+              <div class="field span-2">
+                <label for="kitty-name">活動／Kitty 名稱</label>
+                <input class="input" id="kitty-name" name="kittyName" type="text" value="家庭收支" maxlength="60" required />
+              </div>
+              <div class="field span-2">
+                <label for="currency">本國貨幣</label>
+                <select class="select" id="currency" name="currency">
+                  <option value="HKD" selected>HKD — 港幣</option>
+                  <option value="TWD">TWD — 新台幣</option>
+                  <option value="CNY">CNY — 人民幣</option>
+                  <option value="USD">USD — 美元</option>
+                  <option value="EUR">EUR — 歐元</option>
+                  <option value="JPY">JPY — 日圓</option>
+                </select>
+              </div>
+            </div>
+
+            <p class="section-label">兩位參與者</p>
+            <div class="participant-row" style="margin-bottom: 1.25rem;">
+              <div class="field">
+                <label for="person-a">你</label>
+                <input class="input" id="person-a" name="personA" type="text" value="你" maxlength="30" required />
+              </div>
+              <div class="field">
+                <label for="person-b">另一半</label>
+                <input class="input" id="person-b" name="personB" type="text" value="另一半" maxlength="30" required />
+              </div>
+            </div>
+
+            <p class="section-label">GitHub 網路同步（選填，寫入倉庫需要）</p>
+            <div class="github-hint" style="margin-top:0; margin-bottom:1rem;">
+              開啟網頁會<strong>自動讀取</strong>本專案 <code>data/homesplit.json</code>。
+              若要由兩人共同寫入紀錄，請填入具 Contents 權限的 Fine-grained Token（只存在本機，不會上傳）。
+            </div>
+            <div class="form-grid" style="margin-bottom: 1.1rem;">
+              <div class="field">
+                <label for="setup-gh-owner">倉庫 Owner</label>
+                <input class="input" id="setup-gh-owner" type="text" value="AAMonster2026" autocomplete="off" />
+              </div>
+              <div class="field">
+                <label for="setup-gh-repo">倉庫名稱</label>
+                <input class="input" id="setup-gh-repo" type="text" value="HomeSplit" autocomplete="off" />
+              </div>
+              <div class="field span-2">
+                <label for="setup-gh-token">GitHub Token（寫入用，選填）</label>
+                <input class="input" id="setup-gh-token" type="password" autocomplete="off" placeholder="github_pat_… 或 ghp_…" />
+              </div>
+            </div>
+
+            <button type="submit" class="btn btn-primary btn-lg btn-block">開始使用</button>
+            <p class="hint" style="margin-top: 0.85rem; text-align: center;">
+              無需後端・公開倉庫可自動讀取・寫入需 Token・本機仍會備份
+            </p>
+          </form>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================== Dashboard ===================== -->
+    <section id="screen-dash" class="screen" aria-labelledby="dash-heading">
+      <div class="container">
+        <div class="dash-top">
+          <div>
+            <h1 class="kitty-title" id="dash-heading">家庭收支</h1>
+            <div class="kitty-meta">
+              <span class="pill primary" id="pill-month">—</span>
+              <span class="pill" id="pill-currency">HKD</span>
+              <span class="pill" id="pill-people">你 · 另一半</span>
+            </div>
+          </div>
+          <div class="toolbar-right no-print">
+            <button type="button" class="btn btn-secondary btn-sm" id="btn-edit-kitty">編輯設定</button>
+            <button type="button" class="btn btn-primary" id="btn-open-settle">Settle 結算</button>
+          </div>
+        </div>
+
+        <div class="dash-grid">
+          <!-- Left column: income + expenses -->
+          <div class="stack">
+            <!-- Income & Pool -->
+            <div class="card">
+              <h2 class="card-title">收入與夾錢</h2>
+              <p class="card-sub">輸入本月家庭總收入與共同夾錢（共用資金池）。</p>
+              <div class="form-grid">
+                <div class="field">
+                  <label for="income">本月家庭總收入</label>
+                  <input class="input" id="income" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0.00" />
+                </div>
+                <div class="field">
+                  <label for="pool">共同夾錢金額</label>
+                  <input class="input" id="pool" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0.00" />
+                </div>
+              </div>
+            </div>
+
+            <!-- Add expense -->
+            <div class="card">
+              <h2 class="card-title">新增支出</h2>
+              <p class="card-sub">兩人可分別記錄自己的支出；分類固定為膳食、日常用品、月費、其他。</p>
+              <form id="form-expense">
+                <div class="form-grid cols-4">
+                  <div class="field">
+                    <label for="exp-amount">金額 <span aria-hidden="true">*</span></label>
+                    <input class="input" id="exp-amount" type="number" min="0.01" step="0.01" inputmode="decimal" required placeholder="0.00" />
+                  </div>
+                  <div class="field">
+                    <label for="exp-category">分類</label>
+                    <select class="select" id="exp-category">
+                      <option value="膳食">膳食</option>
+                      <option value="日常用品">日常用品</option>
+                      <option value="月費">月費</option>
+                      <option value="其他">其他</option>
+                    </select>
+                  </div>
+                  <div class="field">
+                    <label for="exp-payer">付款人</label>
+                    <select class="select" id="exp-payer">
+                      <option value="a">你</option>
+                      <option value="b">另一半</option>
+                    </select>
+                  </div>
+                  <div class="field">
+                    <label for="exp-date">日期</label>
+                    <input class="input" id="exp-date" type="date" required />
+                  </div>
+                  <div class="field span-full">
+                    <label for="exp-note">說明（選填）</label>
+                    <input class="input" id="exp-note" type="text" maxlength="120" placeholder="例如：超市採買、電費…" />
+                  </div>
+                </div>
+                <div style="margin-top: 0.9rem;">
+                  <button type="submit" class="btn btn-primary" id="btn-add-expense">加入支出</button>
+                  <button type="button" class="btn btn-ghost" id="btn-cancel-edit" hidden>取消編輯</button>
+                </div>
+                <input type="hidden" id="exp-edit-id" value="" />
+              </form>
+            </div>
+
+            <!-- Expense list -->
+            <div class="card">
+              <div class="toolbar">
+                <div>
+                  <h2 class="card-title" style="margin:0;">支出紀錄</h2>
+                  <p class="card-sub" style="margin:0.25rem 0 0;" id="expense-count">尚無支出</p>
+                </div>
+                <div class="toolbar-right">
+                  <label class="sr-only" for="filter-payer">篩選付款人</label>
+                  <select class="select" id="filter-payer" style="width:auto; min-width:120px;">
+                    <option value="all">全部</option>
+                    <option value="a">你</option>
+                    <option value="b">另一半</option>
+                  </select>
+                </div>
+              </div>
+              <div class="expense-list" id="expense-list" role="list"></div>
+            </div>
+          </div>
+
+          <!-- Right column: live summary -->
+          <aside class="stack" aria-label="即時摘要">
+            <div class="card">
+              <h2 class="card-title">即時計算</h2>
+              <p class="card-sub">支出、分類與應收應付即時更新。</p>
+              <div class="stat-grid" id="stat-grid">
+                <!-- filled by JS -->
+              </div>
+            </div>
+
+            <div class="card">
+              <h2 class="card-title">分類總支出</h2>
+              <div class="category-bars" id="category-bars"></div>
+            </div>
+
+            <div class="card settle-panel">
+              <h2 class="card-title">結算 Settle</h2>
+              <p class="card-sub">計算本月淨收支，並顯示最終誰應付款給誰。結算後可開啟新月份並保留歷史。</p>
+              <div id="settle-preview" style="margin-bottom: 0.85rem;"></div>
+              <button type="button" class="btn btn-primary btn-lg btn-block" id="btn-settle">Settle（結算本月）</button>
+              <button type="button" class="btn btn-secondary btn-block" id="btn-print-summary" style="margin-top:0.5rem;">列印結算摘要</button>
+            </div>
+          </aside>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================== History Screen ===================== -->
+    <section id="screen-history" class="screen" aria-labelledby="history-heading">
+      <div class="container">
+        <div class="dash-top">
+          <div>
+            <h1 class="kitty-title" id="history-heading">歷史月份</h1>
+            <p class="card-sub" style="margin:0.35rem 0 0;">已結算的月份會保留在此，方便回顧。</p>
+          </div>
+          <button type="button" class="btn btn-secondary" id="btn-back-dash">返回本月</button>
+        </div>
+        <div class="card">
+          <div class="history-list" id="history-list"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Print-only settlement summary -->
+    <section id="screen-print" class="print-only" aria-hidden="true">
+      <div class="container">
+        <h1 id="print-title">HomeSplit 結算摘要</h1>
+        <div id="print-body"></div>
+      </div>
+    </section>
+  </main>
+
+  <!-- ===================== Modals ===================== -->
+  <div class="modal-backdrop" id="modal-data" role="dialog" aria-modal="true" aria-labelledby="data-modal-title">
+    <div class="modal wide">
+      <div class="modal-header">
+        <h2 id="data-modal-title">資料與 GitHub 同步</h2>
+        <button type="button" class="btn-icon" data-close="modal-data" aria-label="關閉">✕</button>
+      </div>
+      <p class="card-sub">紀錄會寫入本倉庫的 <code>data/homesplit.json</code> 與 <code>data/homesplit.xml</code>。兩人開啟網頁時會自動讀取最新檔案。</p>
+
+      <p class="section-label">GitHub 專案</p>
+      <form id="form-github">
+        <div class="form-grid">
+          <div class="field">
+            <label for="gh-owner">Owner</label>
+            <input class="input" id="gh-owner" type="text" required autocomplete="off" />
+          </div>
+          <div class="field">
+            <label for="gh-repo">Repo</label>
+            <input class="input" id="gh-repo" type="text" required autocomplete="off" />
+          </div>
+          <div class="field">
+            <label for="gh-branch">分支</label>
+            <input class="input" id="gh-branch" type="text" required autocomplete="off" />
+          </div>
+          <div class="field">
+            <label for="gh-json-path">JSON 路徑</label>
+            <input class="input" id="gh-json-path" type="text" required autocomplete="off" />
+          </div>
+          <div class="field span-2">
+            <label for="gh-xml-path">XML 路徑</label>
+            <input class="input" id="gh-xml-path" type="text" required autocomplete="off" />
+          </div>
+          <div class="field span-2">
+            <label for="gh-token">Fine-grained Token（Contents: Read and write，只存本機）</label>
+            <input class="input" id="gh-token" type="password" autocomplete="off" placeholder="寫入倉庫時需要；公開讀取可不填" />
+          </div>
+        </div>
+        <p class="hint" id="gh-status-hint" style="margin-top:0.65rem;">尚未連線。</p>
+        <div class="modal-actions" style="justify-content:flex-start;">
+          <button type="submit" class="btn btn-primary">儲存連線設定</button>
+          <button type="button" class="btn btn-secondary" id="btn-gh-pull">立即讀取</button>
+          <button type="button" class="btn btn-secondary" id="btn-gh-push">立即寫入</button>
+        </div>
+      </form>
+
+      <hr class="divider" />
+      <p class="section-label">本機備份</p>
+      <div class="stack" style="gap:0.65rem;">
+        <button type="button" class="btn btn-secondary btn-block" id="btn-export-json">匯出完整資料（JSON）</button>
+        <button type="button" class="btn btn-secondary btn-block" id="btn-export-xml">匯出完整資料（XML）</button>
+        <button type="button" class="btn btn-secondary btn-block" id="btn-export-txt">匯出本月摘要（TXT）</button>
+        <button type="button" class="btn btn-secondary btn-block" id="btn-import-json">匯入 JSON 還原</button>
+        <input type="file" id="import-file" accept="application/json,.json,application/xml,.xml,text/xml" hidden />
+        <button type="button" class="btn btn-danger-soft btn-block" id="btn-clear-all">清除所有資料</button>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-ghost" data-close="modal-data">關閉</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" id="modal-edit-kitty" role="dialog" aria-modal="true" aria-labelledby="edit-kitty-title">
+    <div class="modal">
+      <div class="modal-header">
+        <h2 id="edit-kitty-title">編輯 Kitty 設定</h2>
+        <button type="button" class="btn-icon" data-close="modal-edit-kitty" aria-label="關閉">✕</button>
+      </div>
+      <form id="form-edit-kitty">
+        <div class="form-grid">
+          <div class="field span-2">
+            <label for="edit-name">名稱</label>
+            <input class="input" id="edit-name" type="text" maxlength="60" required />
+          </div>
+          <div class="field span-2">
+            <label for="edit-currency">貨幣</label>
+            <select class="select" id="edit-currency">
+              <option value="HKD">HKD — 港幣</option>
+              <option value="TWD">TWD — 新台幣</option>
+              <option value="CNY">CNY — 人民幣</option>
+              <option value="USD">USD — 美元</option>
+              <option value="EUR">EUR — 歐元</option>
+              <option value="JPY">JPY — 日圓</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="edit-person-a">參與者 A</label>
+            <input class="input" id="edit-person-a" type="text" maxlength="30" required />
+          </div>
+          <div class="field">
+            <label for="edit-person-b">參與者 B</label>
+            <input class="input" id="edit-person-b" type="text" maxlength="30" required />
+          </div>
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-ghost" data-close="modal-edit-kitty">取消</button>
+          <button type="submit" class="btn btn-primary">儲存</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" id="modal-settle" role="dialog" aria-modal="true" aria-labelledby="settle-modal-title">
+    <div class="modal">
+      <div class="modal-header">
+        <h2 id="settle-modal-title">確認結算</h2>
+        <button type="button" class="btn-icon" data-close="modal-settle" aria-label="關閉">✕</button>
+      </div>
+      <div id="settle-modal-body"></div>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-ghost" data-close="modal-settle">取消</button>
+        <button type="button" class="btn btn-primary" id="btn-confirm-settle">確認結算並開新月份</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" id="modal-history-detail" role="dialog" aria-modal="true" aria-labelledby="history-detail-title">
+    <div class="modal">
+      <div class="modal-header">
+        <h2 id="history-detail-title">月份詳情</h2>
+        <button type="button" class="btn-icon" data-close="modal-history-detail" aria-label="關閉">✕</button>
+      </div>
+      <div id="history-detail-body"></div>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-ghost" data-close="modal-history-detail">關閉</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast-host" id="toast-host" aria-live="polite"></div>
+
+  <script>
+    /* =========================================================
+       HomeSplit — 應用邏輯
+       架構概要：
+       1. state：所有應用資料（kitty、本月、歷史）
+       2. storage：localStorage 本機備份
+       3. github：將 JSON／XML 寫入同一 GitHub 專案，兩人開啟時自動讀取
+       4. calc：即時計算（支出、應收應付、夾錢剩餘、結算）
+       5. ui：畫面渲染與事件綁定
+       ========================================================= */
+
+    (function () {
+      "use strict";
+
+      // ---------- 常數 ----------
+      var STORAGE_KEY = "homesplit_v1";
+      var GH_CFG_KEY = "homesplit_github_cfg";
+      var DEFAULT_REPO = {
+        owner: "AAMonster2026",
+        repo: "HomeSplit",
+        branch: "main",
+        jsonPath: "data/homesplit.json",
+        xmlPath: "data/homesplit.xml",
+        token: ""
+      };
+      var POLL_MS = 25000;
+      var CATEGORIES = ["膳食", "日常用品", "月費", "其他"];
+      var CATEGORY_TAG = {
+        "膳食": "food",
+        "日常用品": "daily",
+        "月費": "fee",
+        "其他": "other"
+      };
+
+      // ---------- 狀態 ----------
+      /** @type {AppState} */
+      var state = createEmptyState();
+
+      /**
+       * @typedef {Object} Person
+       * @property {string} id - "a" | "b"
+       * @property {string} name
+       *
+       * @typedef {Object} Expense
+       * @property {string} id
+       * @property {number} amount
+       * @property {string} note
+       * @property {string} date - YYYY-MM-DD
+       * @property {string} category
+       * @property {string} payer - "a" | "b"
+       *
+       * @typedef {Object} MonthData
+       * @property {string} id
+       * @property {string} label - e.g. 2026-08
+       * @property {number} income
+       * @property {number} pool
+       * @property {Expense[]} expenses
+       * @property {Object|null} settlement - 結算結果（歷史月份才有）
+       * @property {string|null} settledAt
+       *
+       * @typedef {Object} AppState
+       * @property {boolean} setupDone
+       * @property {string} kittyName
+       * @property {string} currency
+       * @property {Person[]} people
+       * @property {MonthData} current
+       * @property {MonthData[]} history
+       * @property {string} theme - "light" | "dark"
+       * @property {string|null} updatedAt - ISO 時間，用於網路同步比較
+       */
+
+      function createEmptyState() {
+        return {
+          setupDone: false,
+          kittyName: "家庭收支",
+          currency: "HKD",
+          people: [
+            { id: "a", name: "你" },
+            { id: "b", name: "另一半" }
+          ],
+          current: createMonth(),
+          history: [],
+          theme: "light",
+          updatedAt: null
+        };
+      }
+
+      /** 建立一個新月份資料物件 */
+      function createMonth(label) {
+        var now = new Date();
+        var y = now.getFullYear();
+        var m = String(now.getMonth() + 1).padStart(2, "0");
+        return {
+          id: uid(),
+          label: label || (y + "-" + m),
+          income: 0,
+          pool: 0,
+          expenses: [],
+          settlement: null,
+          settledAt: null
+        };
+      }
+
+      function uid() {
+        return "id_" + Date.now().toString(36) + "_" + Math.random().toString(36).slice(2, 8);
+      }
+
+      /** @type {typeof DEFAULT_REPO} */
+      var githubCfg = Object.assign({}, DEFAULT_REPO);
+      var githubJsonSha = null;
+      var githubXmlSha = null;
+      var githubPushTimer = null;
+      var githubPollTimer = null;
+      var githubBusy = false;
+      var lastRemoteUpdatedAt = null;
+
+      function todayISO() {
+        var d = new Date();
+        return d.getFullYear() + "-" +
+          String(d.getMonth() + 1).padStart(2, "0") + "-" +
+          String(d.getDate()).padStart(2, "0");
+      }
+
+      // ---------- Storage（本機 + GitHub JSON／XML） ----------
+      function applyData(data, opts) {
+        opts = opts || {};
+        var keepTheme = opts.keepTheme && state && state.theme;
+        var theme = keepTheme ? state.theme : (data && data.theme);
+        state = Object.assign(createEmptyState(), data || {});
+        if (!state.current || !Array.isArray(state.current.expenses)) {
+          state.current = createMonth();
+        }
+        if (!Array.isArray(state.history)) state.history = [];
+        if (!Array.isArray(state.people) || state.people.length < 2) {
+          state.people = [
+            { id: "a", name: "你" },
+            { id: "b", name: "另一半" }
+          ];
+        }
+        if (theme) state.theme = theme;
+        return true;
+      }
+
+      function payloadForRemote() {
+        // 主題屬個人偏好，不同步到倉庫，避免互相覆蓋
+        var copy = JSON.parse(JSON.stringify(state));
+        delete copy.theme;
+        return copy;
+      }
+
+      function save(opts) {
+        opts = opts || {};
+        try {
+          if (!opts.keepTimestamp) {
+            state.updatedAt = new Date().toISOString();
+          }
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+        } catch (e) {
+          toast("無法儲存資料（localStorage 可能已滿或被停用）");
+        }
+        if (!opts.skipRemote && githubCfg.token && state.setupDone) {
+          scheduleGithubPush();
+        }
+      }
+
+      function load() {
+        try {
+          var raw = localStorage.getItem(STORAGE_KEY);
+          if (!raw) return false;
+          return applyData(JSON.parse(raw));
+        } catch (e) {
+          console.warn("讀取資料失敗", e);
+          return false;
+        }
+      }
+
+      function loadGithubCfg() {
+        githubCfg = Object.assign({}, DEFAULT_REPO);
+        try {
+          var raw = localStorage.getItem(GH_CFG_KEY);
+          if (raw) Object.assign(githubCfg, JSON.parse(raw));
+        } catch (e) {}
+        var detected = detectRepoFromLocation();
+        if (detected && !localStorage.getItem(GH_CFG_KEY)) {
+          githubCfg.owner = detected.owner;
+          githubCfg.repo = detected.repo;
+        }
+      }
+
+      function saveGithubCfg() {
+        try {
+          localStorage.setItem(GH_CFG_KEY, JSON.stringify(githubCfg));
+        } catch (e) {}
+      }
+
+      /** 若網站架在 GitHub Pages，自動推斷 owner／repo */
+      function detectRepoFromLocation() {
+        try {
+          var host = location.hostname || "";
+          var path = location.pathname || "";
+          var m = host.match(/^([^.]+)\.github\.io$/i);
+          if (m) {
+            var owner = m[1];
+            var parts = path.split("/").filter(Boolean);
+            var repo = parts[0] && parts[0].indexOf(".html") === -1
+              ? parts[0]
+              : owner + ".github.io";
+            return { owner: owner, repo: repo };
+          }
+        } catch (e) {}
+        return null;
+      }
+
+      function setSyncStatus(kind, text) {
+        var pill = document.getElementById("sync-status");
+        var label = document.getElementById("sync-status-text");
+        if (!pill || !label) return;
+        pill.className = "sync-pill" + (kind ? " " + kind : "");
+        label.textContent = text;
+        var hint = document.getElementById("gh-status-hint");
+        if (hint) hint.textContent = text;
+      }
+
+      function utf8ToBase64(str) {
+        var bytes = new TextEncoder().encode(str);
+        var bin = "";
+        for (var i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+        return btoa(bin);
+      }
+
+      function base64ToUtf8(b64) {
+        var bin = atob(String(b64 || "").replace(/\s/g, ""));
+        var bytes = new Uint8Array(bin.length);
+        for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+        return new TextDecoder().decode(bytes);
+      }
+
+      function xmlEscape(str) {
+        return String(str)
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;");
+      }
+
+      function stateToXml(s) {
+        function expenseXml(e) {
+          return "      <expense id=\"" + xmlEscape(e.id) +
+            "\" amount=\"" + xmlEscape(e.amount) +
+            "\" date=\"" + xmlEscape(e.date) +
+            "\" category=\"" + xmlEscape(e.category) +
+            "\" payer=\"" + xmlEscape(e.payer) +
+            "\" note=\"" + xmlEscape(e.note || "") + "\"/>";
+        }
+        function monthXml(m, tag) {
+          var lines = [];
+          lines.push("  <" + tag + " id=\"" + xmlEscape(m.id) +
+            "\" label=\"" + xmlEscape(m.label) +
+            "\" income=\"" + xmlEscape(m.income || 0) +
+            "\" pool=\"" + xmlEscape(m.pool || 0) +
+            "\" settledAt=\"" + xmlEscape(m.settledAt || "") + "\">");
+          lines.push("    <expenses>");
+          (m.expenses || []).forEach(function (e) { lines.push(expenseXml(e)); });
+          lines.push("    </expenses>");
+          if (m.settlement) {
+            lines.push("    <settlement json=\"" + xmlEscape(JSON.stringify(m.settlement)) + "\"/>");
+          }
+          lines.push("  </" + tag + ">");
+          return lines.join("\n");
+        }
+        var people = (s.people || []).map(function (p) {
+          return "    <person id=\"" + xmlEscape(p.id) + "\" name=\"" + xmlEscape(p.name) + "\"/>";
+        }).join("\n");
+        var history = (s.history || []).map(function (m) { return monthXml(m, "month"); }).join("\n");
+        return "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" +
+          "<homesplit setupDone=\"" + (s.setupDone ? "true" : "false") +
+          "\" kittyName=\"" + xmlEscape(s.kittyName || "") +
+          "\" currency=\"" + xmlEscape(s.currency || "HKD") +
+          "\" updatedAt=\"" + xmlEscape(s.updatedAt || "") + "\">\n" +
+          "  <people>\n" + people + "\n  </people>\n" +
+          monthXml(s.current, "current") + "\n" +
+          "  <history>\n" + (history || "") + "\n  </history>\n" +
+          "</homesplit>\n";
+      }
+
+      function xmlToState(xmlText) {
+        var parser = new DOMParser();
+        var doc = parser.parseFromString(xmlText, "application/xml");
+        if (doc.querySelector("parsererror")) throw new Error("XML 格式錯誤");
+        var root = doc.documentElement;
+        function attr(el, name, fallback) {
+          if (!el || !el.getAttribute) return fallback;
+          var v = el.getAttribute(name);
+          return v == null || v === "" ? fallback : v;
+        }
+        function parseMonth(el) {
+          if (!el) return createMonth();
+          var expenses = [];
+          Array.prototype.forEach.call(el.querySelectorAll("expenses expense"), function (node) {
+            expenses.push({
+              id: attr(node, "id", uid()),
+              amount: parseFloat(attr(node, "amount", "0")) || 0,
+              date: attr(node, "date", todayISO()),
+              category: attr(node, "category", "其他"),
+              payer: attr(node, "payer", "a"),
+              note: attr(node, "note", "")
+            });
+          });
+          var settlement = null;
+          var setEl = el.querySelector("settlement");
+          if (setEl && attr(setEl, "json")) {
+            try { settlement = JSON.parse(attr(setEl, "json")); } catch (err) { settlement = null; }
+          }
+          return {
+            id: attr(el, "id", uid()),
+            label: attr(el, "label", ""),
+            income: parseFloat(attr(el, "income", "0")) || 0,
+            pool: parseFloat(attr(el, "pool", "0")) || 0,
+            expenses: expenses,
+            settlement: settlement,
+            settledAt: attr(el, "settledAt", null)
+          };
+        }
+        var people = [];
+        Array.prototype.forEach.call(root.querySelectorAll("people person"), function (p) {
+          people.push({ id: attr(p, "id", "a"), name: attr(p, "name", "") });
+        });
+        var history = [];
+        Array.prototype.forEach.call(root.querySelectorAll("history > month"), function (m) {
+          history.push(parseMonth(m));
+        });
+        return {
+          setupDone: attr(root, "setupDone", "false") === "true",
+          kittyName: attr(root, "kittyName", "家庭收支"),
+          currency: attr(root, "currency", "HKD"),
+          people: people.length >= 2 ? people : createEmptyState().people,
+          current: parseMonth(root.querySelector("current")),
+          history: history,
+          updatedAt: attr(root, "updatedAt", null)
+        };
+      }
+
+      function githubHeaders() {
+        var h = {
+          "Accept": "application/vnd.github+json",
+          "X-GitHub-Api-Version": "2022-11-28"
+        };
+        if (githubCfg.token) h.Authorization = "Bearer " + githubCfg.token;
+        return h;
+      }
+
+      function githubContentsUrl(path) {
+        return "https://api.github.com/repos/" +
+          encodeURIComponent(githubCfg.owner) + "/" +
+          encodeURIComponent(githubCfg.repo) +
+          "/contents/" + path.split("/").map(encodeURIComponent).join("/") +
+          "?ref=" + encodeURIComponent(githubCfg.branch);
+      }
+
+      function githubRawUrl(path) {
+        return "https://raw.githubusercontent.com/" +
+          encodeURIComponent(githubCfg.owner) + "/" +
+          encodeURIComponent(githubCfg.repo) + "/" +
+          encodeURIComponent(githubCfg.branch) + "/" + path +
+          "?t=" + Date.now();
+      }
+
+      function getGithubFile(path) {
+        return fetch(githubContentsUrl(path), { headers: githubHeaders() })
+          .then(function (res) {
+            if (res.status === 404) return { sha: null, text: null };
+            if (!res.ok) throw new Error("GitHub 讀取失敗（" + res.status + "）");
+            return res.json().then(function (body) {
+              return {
+                sha: body.sha,
+                text: body.content ? base64ToUtf8(body.content) : ""
+              };
+            });
+          });
+      }
+
+      function putGithubFile(path, text, sha, message) {
+        var url = githubContentsUrl(path).replace(/\?ref=.*$/, "");
+        var body = {
+          message: message,
+          content: utf8ToBase64(text),
+          branch: githubCfg.branch
+        };
+        if (sha) body.sha = sha;
+        return fetch(url, {
+          method: "PUT",
+          headers: Object.assign({ "Content-Type": "application/json" }, githubHeaders()),
+          body: JSON.stringify(body)
+        }).then(function (res) {
+          return res.json().then(function (json) {
+            if (!res.ok) {
+              var msg = (json && json.message) || ("HTTP " + res.status);
+              var err = new Error(msg);
+              err.status = res.status;
+              err.body = json;
+              throw err;
+            }
+            return json.content && json.content.sha ? json.content.sha : sha;
+          });
+        });
+      }
+
+      function parseRemoteJson(text) {
+        var data = JSON.parse(text);
+        if (!data || typeof data !== "object") throw new Error("遠端 JSON 格式錯誤");
+        return data;
+      }
+
+      function fetchSameOriginJson() {
+        return fetch("data/homesplit.json", { cache: "no-store" })
+          .then(function (res) { return res.ok ? res.json() : null; })
+          .catch(function () { return null; });
+      }
+
+      function fetchRawJson() {
+        return fetch(githubRawUrl(githubCfg.jsonPath), { cache: "no-store" })
+          .then(function (res) { return res.ok ? res.json() : null; })
+          .catch(function () { return null; });
+      }
+
+      function isRemoteNewer(remote) {
+        if (!remote) return false;
+        if (remote.setupDone && !state.setupDone) return true;
+        if (!remote.updatedAt) return false;
+        if (!state.updatedAt) return !!remote.setupDone;
+        return String(remote.updatedAt) > String(state.updatedAt);
+      }
+
+      function applyRemoteIfNewer(remote, silent) {
+        if (!remote || typeof remote !== "object") return false;
+        if (!isRemoteNewer(remote) && state.setupDone) return false;
+        if (!remote.setupDone && !state.setupDone) return false;
+        applyData(remote, { keepTheme: true });
+        lastRemoteUpdatedAt = state.updatedAt;
+        save({ skipRemote: true, keepTimestamp: true });
+        if (!silent) toast("已從 GitHub 載入最新紀錄");
+        return true;
+      }
+
+      function pullFromGithub(opts) {
+        opts = opts || {};
+        setSyncStatus("busy", "正在讀取 GitHub…");
+        var loader;
+        if (githubCfg.token) {
+          loader = getGithubFile(githubCfg.jsonPath)
+            .then(function (file) {
+              if (file.sha) githubJsonSha = file.sha;
+              if (file.text) return parseRemoteJson(file.text);
+              return fetchSameOriginJson().then(function (localFile) {
+                return localFile || fetchRawJson();
+              });
+            });
+        } else {
+          // 公開倉庫：優先同源／raw，避免未認證 API 每小時 60 次上限
+          loader = fetchSameOriginJson().then(function (localFile) {
+            return localFile || fetchRawJson();
+          });
+        }
+        return loader
+          .then(function (remote) {
+            if (!remote) {
+              setSyncStatus("warn", githubCfg.token ? "倉庫尚無紀錄，將於寫入時建立" : "找不到遠端 JSON；寫入需 Token");
+              return null;
+            }
+            lastRemoteUpdatedAt = remote.updatedAt || null;
+            var applied = applyRemoteIfNewer(remote, opts.silent);
+            if (githubCfg.token) {
+              setSyncStatus("ok", "GitHub 已同步" + (state.updatedAt ? " · " + state.updatedAt.slice(0, 16).replace("T", " ") : ""));
+            } else {
+              setSyncStatus("ok", "已自動讀取公開倉庫（唯讀）");
+            }
+            return { remote: remote, applied: applied };
+          })
+          .catch(function (err) {
+            setSyncStatus("err", err.message || "讀取失敗");
+            return null;
+          });
+      }
+
+      function pushToGithub() {
+        if (!githubCfg.token) {
+          setSyncStatus("warn", "未設定 Token，僅能讀取公開倉庫");
+          return Promise.resolve(false);
+        }
+        if (githubBusy) return Promise.resolve(false);
+        githubBusy = true;
+        setSyncStatus("busy", "正在寫入 GitHub JSON／XML…");
+        var jsonText = JSON.stringify(payloadForRemote(), null, 2);
+        var xmlText = stateToXml(payloadForRemote());
+        var msg = "chore(data): sync HomeSplit " + (state.current && state.current.label ? state.current.label : "") +
+          " @ " + (state.updatedAt || "");
+
+        function putOne(path, text, shaRef, setter) {
+          return putGithubFile(path, text, shaRef, msg).then(function (newSha) {
+            setter(newSha);
+          }).catch(function (err) {
+            if (err.status === 409 || err.status === 422) {
+              return getGithubFile(path).then(function (file) {
+                setter(file.sha);
+                return putGithubFile(path, text, file.sha, msg).then(function (newSha) {
+                  setter(newSha);
+                });
+              });
+            }
+            throw err;
+          });
+        }
+
+        return getGithubFile(githubCfg.jsonPath)
+          .then(function (jsonFile) {
+            if (jsonFile.sha) githubJsonSha = jsonFile.sha;
+            return getGithubFile(githubCfg.xmlPath).then(function (xmlFile) {
+              if (xmlFile.sha) githubXmlSha = xmlFile.sha;
+              return putOne(githubCfg.jsonPath, jsonText, githubJsonSha, function (s) { githubJsonSha = s; })
+                .then(function () {
+                  return putOne(githubCfg.xmlPath, xmlText, githubXmlSha, function (s) { githubXmlSha = s; });
+                });
+            });
+          })
+          .then(function () {
+            lastRemoteUpdatedAt = state.updatedAt;
+            setSyncStatus("ok", "已寫入 data/*.json 與 data/*.xml");
+            githubBusy = false;
+            return true;
+          })
+          .catch(function (err) {
+            githubBusy = false;
+            setSyncStatus("err", "寫入失敗：" + (err.message || "未知錯誤"));
+            toast("GitHub 寫入失敗：" + (err.message || ""));
+            return false;
+          });
+      }
+
+      function scheduleGithubPush() {
+        if (!githubCfg.token) return;
+        clearTimeout(githubPushTimer);
+        githubPushTimer = setTimeout(function () { pushToGithub(); }, 900);
+      }
+
+      function fillGithubForm() {
+        var owner = document.getElementById("gh-owner");
+        if (!owner) return;
+        owner.value = githubCfg.owner || "";
+        document.getElementById("gh-repo").value = githubCfg.repo || "";
+        document.getElementById("gh-branch").value = githubCfg.branch || "main";
+        document.getElementById("gh-json-path").value = githubCfg.jsonPath || "data/homesplit.json";
+        document.getElementById("gh-xml-path").value = githubCfg.xmlPath || "data/homesplit.xml";
+        document.getElementById("gh-token").value = githubCfg.token || "";
+        var setupOwner = document.getElementById("setup-gh-owner");
+        if (setupOwner) {
+          setupOwner.value = githubCfg.owner || DEFAULT_REPO.owner;
+          document.getElementById("setup-gh-repo").value = githubCfg.repo || DEFAULT_REPO.repo;
+          document.getElementById("setup-gh-token").value = githubCfg.token || "";
+        }
+      }
+
+      function startGithubPolling() {
+        clearInterval(githubPollTimer);
+        githubPollTimer = setInterval(function () {
+          if (document.hidden) return;
+          if (githubBusy) return;
+          pullFromGithub({ silent: true }).then(function (result) {
+            if (result && result.applied) {
+              resetExpenseForm();
+              if (state.setupDone) renderAll();
+              else showScreen("screen-setup");
+            }
+          });
+        }, githubCfg.token ? POLL_MS : 45000);
+      }
+
+      // ---------- Helpers ----------
+      function personName(id) {
+        var p = state.people.find(function (x) { return x.id === id; });
+        return p ? p.name : id;
+      }
+
+      function money(n) {
+        var num = Number(n) || 0;
+        // JPY 通常無小數，其餘兩位
+        var digits = state.currency === "JPY" ? 0 : 2;
+        try {
+          return new Intl.NumberFormat("zh-Hant", {
+            style: "currency",
+            currency: state.currency,
+            minimumFractionDigits: digits,
+            maximumFractionDigits: digits
+          }).format(num);
+        } catch (e) {
+          return state.currency + " " + num.toFixed(digits);
+        }
+      }
+
+      function round2(n) {
+        return Math.round((Number(n) + Number.EPSILON) * 100) / 100;
+      }
+
+      function escapeHtml(str) {
+        return String(str)
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;");
+      }
+
+      function toast(msg) {
+        var host = document.getElementById("toast-host");
+        var el = document.createElement("div");
+        el.className = "toast";
+        el.textContent = msg;
+        host.appendChild(el);
+        setTimeout(function () {
+          el.style.opacity = "0";
+          el.style.transition = "opacity 0.3s";
+          setTimeout(function () { el.remove(); }, 300);
+        }, 2600);
+      }
+
+      function downloadBlob(filename, content, mime) {
+        var blob = new Blob([content], { type: mime || "text/plain;charset=utf-8" });
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement("a");
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+      }
+
+      // ---------- 計算引擎 ----------
+      /**
+       * 計算本月（或指定月份）的完整摘要
+       * 分帳邏輯（KittySplit 風格、兩人平分）：
+       * - 每筆支出視為共同支出，應由兩人各擔一半
+       * - 若 A 付了 X，則 B 欠 A 的金額為 X/2；反之亦然
+       * - 淨額 = A應付給B 或 B應付給A
+       * - 夾錢剩餘 = 夾錢 − 總支出（可為負，表示超支）
+       */
+      function computeSummary(month) {
+        month = month || state.current;
+        var expenses = month.expenses || [];
+        var spentA = 0;
+        var spentB = 0;
+        var byCat = {};
+        CATEGORIES.forEach(function (c) { byCat[c] = 0; });
+
+        expenses.forEach(function (e) {
+          var amt = Number(e.amount) || 0;
+          if (e.payer === "a") spentA += amt;
+          else spentB += amt;
+          if (byCat[e.category] !== undefined) byCat[e.category] += amt;
+          else byCat["其他"] += amt;
+        });
+
+        spentA = round2(spentA);
+        spentB = round2(spentB);
+        var totalSpent = round2(spentA + spentB);
+        var income = round2(month.income || 0);
+        var pool = round2(month.pool || 0);
+        var poolRemain = round2(pool - totalSpent);
+        var net = round2(income - totalSpent);
+
+        // 平分：每人應負擔 total/2
+        // A 已付 spentA，若 spentA > fairShare，則 B 欠 A (spentA - fairShare)
+        var fairShare = round2(totalSpent / 2);
+        var balance = round2(spentA - fairShare); // >0 表示 B 欠 A；<0 表示 A 欠 B
+        var debtor = null;
+        var creditor = null;
+        var oweAmount = 0;
+        if (balance > 0.004) {
+          debtor = "b";
+          creditor = "a";
+          oweAmount = balance;
+        } else if (balance < -0.004) {
+          debtor = "a";
+          creditor = "b";
+          oweAmount = Math.abs(balance);
+        }
+
+        return {
+          spentA: spentA,
+          spentB: spentB,
+          totalSpent: totalSpent,
+          byCat: byCat,
+          income: income,
+          pool: pool,
+          poolRemain: poolRemain,
+          net: net,
+          fairShare: fairShare,
+          balance: balance,
+          debtor: debtor,
+          creditor: creditor,
+          oweAmount: round2(oweAmount)
+        };
+      }
+
+      function settlementText(summary) {
+        if (!summary.debtor) {
+          return "兩人支出剛好平衡，無需轉帳。";
+        }
+        return personName(summary.debtor) + " 應支付 " +
+          money(summary.oweAmount) + " 給 " + personName(summary.creditor);
+      }
+
+      // ---------- UI：畫面切換 ----------
+      function showScreen(id) {
+        ["screen-setup", "screen-dash", "screen-history"].forEach(function (sid) {
+          var el = document.getElementById(sid);
+          if (el) el.classList.toggle("active", sid === id);
+        });
+        var showNav = id !== "screen-setup";
+        document.getElementById("btn-data").hidden = false;
+        document.getElementById("btn-history").hidden = !showNav;
+      }
+
+      function openModal(id) {
+        var el = document.getElementById(id);
+        if (el) el.classList.add("open");
+      }
+
+      function closeModal(id) {
+        var el = document.getElementById(id);
+        if (el) el.classList.remove("open");
+      }
+
+      function applyTheme() {
+        document.documentElement.setAttribute(
+          "data-theme",
+          state.theme === "dark" ? "dark" : "light"
+        );
+      }
+
+      // ---------- UI：渲染 ----------
+      function renderAll() {
+        applyTheme();
+        if (!state.setupDone) {
+          showScreen("screen-setup");
+          return;
+        }
+        showScreen("screen-dash");
+        renderDashHeader();
+        renderIncomeFields();
+        renderPayerOptions();
+        renderExpenseList();
+        renderStats();
+        renderSettlePreview();
+      }
+
+      function renderDashHeader() {
+        document.getElementById("dash-heading").textContent = state.kittyName;
+        document.getElementById("pill-month").textContent = "本月 " + state.current.label;
+        document.getElementById("pill-currency").textContent = state.currency;
+        document.getElementById("pill-people").textContent =
+          state.people[0].name + " · " + state.people[1].name;
+      }
+
+      function renderIncomeFields() {
+        document.getElementById("income").value =
+          state.current.income ? state.current.income : "";
+        document.getElementById("pool").value =
+          state.current.pool ? state.current.pool : "";
+      }
+
+      function renderPayerOptions() {
+        var selects = [
+          document.getElementById("exp-payer"),
+          document.getElementById("filter-payer")
+        ];
+        // 付款人下拉
+        var payerSel = selects[0];
+        var cur = payerSel.value || "a";
+        payerSel.innerHTML =
+          '<option value="a">' + escapeHtml(state.people[0].name) + "</option>" +
+          '<option value="b">' + escapeHtml(state.people[1].name) + "</option>";
+        payerSel.value = cur;
+
+        // 篩選下拉
+        var filterSel = selects[1];
+        var fcur = filterSel.value || "all";
+        filterSel.innerHTML =
+          '<option value="all">全部</option>' +
+          '<option value="a">' + escapeHtml(state.people[0].name) + "</option>" +
+          '<option value="b">' + escapeHtml(state.people[1].name) + "</option>";
+        filterSel.value = fcur;
+      }
+
+      function renderExpenseList() {
+        var filter = document.getElementById("filter-payer").value || "all";
+        var list = state.current.expenses.slice().sort(function (a, b) {
+          // 日期新到舊，同日則新加入在前
+          if (a.date !== b.date) return a.date < b.date ? 1 : -1;
+          return a.id < b.id ? 1 : -1;
+        });
+        if (filter !== "all") {
+          list = list.filter(function (e) { return e.payer === filter; });
+        }
+
+        var countEl = document.getElementById("expense-count");
+        countEl.textContent = state.current.expenses.length
+          ? ("共 " + state.current.expenses.length + " 筆" +
+            (filter !== "all" ? "（顯示 " + list.length + " 筆）" : ""))
+          : "尚無支出";
+
+        var host = document.getElementById("expense-list");
+        if (!list.length) {
+          host.innerHTML =
+            '<div class="empty-state"><strong>還沒有支出紀錄</strong>新增第一筆，開始分帳吧。</div>';
+          return;
+        }
+
+        host.innerHTML = list.map(function (e) {
+          var tagClass = CATEGORY_TAG[e.category] || "other";
+          return (
+            '<article class="expense-item" role="listitem" data-id="' + escapeHtml(e.id) + '">' +
+              '<div class="expense-main">' +
+                '<div class="expense-top">' +
+                  '<span class="expense-amount">' + escapeHtml(money(e.amount)) + "</span>" +
+                  (e.note
+                    ? '<span class="expense-desc">' + escapeHtml(e.note) + "</span>"
+                    : "") +
+                "</div>" +
+                '<div class="expense-meta">' +
+                  '<span class="tag ' + tagClass + '">' + escapeHtml(e.category) + "</span>" +
+                  "<span>" + escapeHtml(personName(e.payer)) + " 付款</span>" +
+                  "<span>" + escapeHtml(e.date) + "</span>" +
+                "</div>" +
+              "</div>" +
+              '<div class="expense-actions">' +
+                '<button type="button" class="btn-icon" data-action="edit" title="編輯" aria-label="編輯">✎</button>' +
+                '<button type="button" class="btn-icon" data-action="delete" title="刪除" aria-label="刪除">🗑</button>' +
+              "</div>" +
+            "</article>"
+          );
+        }).join("");
+      }
+
+      function renderStats() {
+        var s = computeSummary();
+        var grid = document.getElementById("stat-grid");
+        grid.innerHTML =
+          '<div class="stat"><div class="stat-label">' + escapeHtml(state.people[0].name) + " 總支出</div>" +
+            '<div class="stat-value">' + escapeHtml(money(s.spentA)) + "</div></div>" +
+          '<div class="stat"><div class="stat-label">' + escapeHtml(state.people[1].name) + " 總支出</div>" +
+            '<div class="stat-value">' + escapeHtml(money(s.spentB)) + "</div></div>" +
+          '<div class="stat"><div class="stat-label">總支出</div>' +
+            '<div class="stat-value">' + escapeHtml(money(s.totalSpent)) + "</div></div>" +
+          '<div class="stat"><div class="stat-label">夾錢剩餘</div>' +
+            '<div class="stat-value ' + (s.poolRemain < 0 ? "negative" : "positive") + '">' +
+            escapeHtml(money(s.poolRemain)) + "</div></div>" +
+          '<div class="stat highlight"><div class="stat-label">應收／應付</div>' +
+            '<div class="stat-value">' + escapeHtml(settlementText(s)) + "</div></div>";
+
+        // 分類長條
+        var maxCat = Math.max.apply(null, CATEGORIES.map(function (c) { return s.byCat[c] || 0; })) || 1;
+        var bars = document.getElementById("category-bars");
+        bars.innerHTML = CATEGORIES.map(function (c) {
+          var amt = s.byCat[c] || 0;
+          var pct = Math.round((amt / maxCat) * 100);
+          return (
+            '<div class="cat-row">' +
+              '<span class="cat-name">' + escapeHtml(c) + "</span>" +
+              '<div class="cat-bar" data-cat="' + escapeHtml(c) + '"><span style="width:' + pct + '%"></span></div>' +
+              '<span class="cat-amt">' + escapeHtml(money(amt)) + "</span>" +
+            "</div>"
+          );
+        }).join("");
+      }
+
+      function renderSettlePreview() {
+        var s = computeSummary();
+        var el = document.getElementById("settle-preview");
+        el.innerHTML =
+          '<div class="stat-grid">' +
+            '<div class="stat"><div class="stat-label">家庭收入</div><div class="stat-value">' +
+              escapeHtml(money(s.income)) + "</div></div>" +
+            '<div class="stat"><div class="stat-label">本月淨收支</div>' +
+              '<div class="stat-value ' + (s.net < 0 ? "negative" : "positive") + '">' +
+              escapeHtml(money(s.net)) + "</div></div>" +
+          "</div>" +
+          '<p style="margin:0.75rem 0 0;font-size:0.9rem;color:var(--text-secondary);">' +
+            escapeHtml(settlementText(s)) +
+          "</p>";
+      }
+
+      function renderHistory() {
+        var host = document.getElementById("history-list");
+        if (!state.history.length) {
+          host.innerHTML =
+            '<div class="empty-state"><strong>尚無歷史紀錄</strong>結算本月後，紀錄會出現在這裡。</div>';
+          return;
+        }
+        // 新到舊
+        var items = state.history.slice().reverse();
+        host.innerHTML = items.map(function (m) {
+          var s = m.settlement || computeSummary(m);
+          return (
+            '<div class="history-item" data-id="' + escapeHtml(m.id) + '">' +
+              "<div><strong>" + escapeHtml(m.label) + "</strong>" +
+              "<span>總支出 " + escapeHtml(money(s.totalSpent)) +
+              " · 淨收支 " + escapeHtml(money(s.net)) +
+              (m.settledAt ? " · 結算於 " + escapeHtml(m.settledAt.slice(0, 10)) : "") +
+              "</span></div>" +
+              '<button type="button" class="btn btn-secondary btn-sm" data-action="view-history">查看</button>' +
+            "</div>"
+          );
+        }).join("");
+      }
+
+      // ---------- 支出 CRUD ----------
+      function resetExpenseForm() {
+        document.getElementById("form-expense").reset();
+        document.getElementById("exp-date").value = todayISO();
+        document.getElementById("exp-edit-id").value = "";
+        document.getElementById("btn-add-expense").textContent = "加入支出";
+        document.getElementById("btn-cancel-edit").hidden = true;
+      }
+
+      function startEditExpense(id) {
+        var e = state.current.expenses.find(function (x) { return x.id === id; });
+        if (!e) return;
+        document.getElementById("exp-amount").value = e.amount;
+        document.getElementById("exp-category").value = e.category;
+        document.getElementById("exp-payer").value = e.payer;
+        document.getElementById("exp-date").value = e.date;
+        document.getElementById("exp-note").value = e.note || "";
+        document.getElementById("exp-edit-id").value = e.id;
+        document.getElementById("btn-add-expense").textContent = "更新支出";
+        document.getElementById("btn-cancel-edit").hidden = false;
+        document.getElementById("exp-amount").focus();
+        document.getElementById("form-expense").scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+
+      function deleteExpense(id) {
+        if (!confirm("確定刪除此筆支出？")) return;
+        state.current.expenses = state.current.expenses.filter(function (e) {
+          return e.id !== id;
+        });
+        // 若正在編輯該筆，取消編輯
+        if (document.getElementById("exp-edit-id").value === id) {
+          resetExpenseForm();
+        }
+        save();
+        renderExpenseList();
+        renderStats();
+        renderSettlePreview();
+        toast("已刪除支出");
+      }
+
+      // ---------- 結算 ----------
+      function buildSettleHtml(summary) {
+        return (
+          "<p>即將結算 <strong>" + escapeHtml(state.current.label) + "</strong>，並開啟新月份。</p>" +
+          '<div class="settle-result">' +
+            "<h3>結算結果</h3>" +
+            "<p>家庭總收入：" + escapeHtml(money(summary.income)) + "</p>" +
+            "<p>總支出：" + escapeHtml(money(summary.totalSpent)) + "</p>" +
+            "<p>本月淨收支（收入 − 支出）：<strong>" + escapeHtml(money(summary.net)) + "</strong></p>" +
+            "<p>夾錢剩餘：" + escapeHtml(money(summary.poolRemain)) + "</p>" +
+            "<p><strong>" + escapeHtml(settlementText(summary)) + "</strong></p>" +
+            "<p style='margin-top:0.6rem;font-size:0.85rem;opacity:0.85;'>" +
+              escapeHtml(state.people[0].name) + " 支出 " + escapeHtml(money(summary.spentA)) +
+              " · " + escapeHtml(state.people[1].name) + " 支出 " + escapeHtml(money(summary.spentB)) +
+            "</p>" +
+          "</div>"
+        );
+      }
+
+      function confirmSettle() {
+        var summary = computeSummary();
+        var settled = Object.assign({}, state.current, {
+          settlement: summary,
+          settledAt: new Date().toISOString()
+        });
+        state.history.push(settled);
+
+        // 開啟新月份：沿用下一個月標籤，收入／夾錢歸零，支出清空
+        var parts = state.current.label.split("-");
+        var y = parseInt(parts[0], 10);
+        var m = parseInt(parts[1], 10);
+        m += 1;
+        if (m > 12) { m = 1; y += 1; }
+        var nextLabel = y + "-" + String(m).padStart(2, "0");
+        state.current = createMonth(nextLabel);
+
+        save();
+        closeModal("modal-settle");
+        resetExpenseForm();
+        renderAll();
+        toast("已結算 " + settled.label + "，新月份 " + nextLabel + " 開始！");
+      }
+
+      // ---------- 匯出／匯入 ----------
+      function exportJSON() {
+        var payload = JSON.stringify(state, null, 2);
+        var name = "homesplit-" + state.current.label + ".json";
+        downloadBlob(name, payload, "application/json;charset=utf-8");
+        toast("已匯出 JSON");
+      }
+
+      function exportTXT() {
+        var s = computeSummary();
+        var lines = [];
+        lines.push("HomeSplit 本月摘要");
+        lines.push("====================");
+        lines.push("Kitty：" + state.kittyName);
+        lines.push("月份：" + state.current.label);
+        lines.push("貨幣：" + state.currency);
+        lines.push("參與者：" + state.people[0].name + "、" + state.people[1].name);
+        lines.push("");
+        lines.push("家庭總收入：" + money(s.income));
+        lines.push("共同夾錢：" + money(s.pool));
+        lines.push("夾錢剩餘：" + money(s.poolRemain));
+        lines.push("總支出：" + money(s.totalSpent));
+        lines.push("本月淨收支：" + money(s.net));
+        lines.push("");
+        lines.push(state.people[0].name + " 總支出：" + money(s.spentA));
+        lines.push(state.people[1].name + " 總支出：" + money(s.spentB));
+        lines.push("每人應負擔：" + money(s.fairShare));
+        lines.push("結算：" + settlementText(s));
+        lines.push("");
+        lines.push("—— 分類 ——");
+        CATEGORIES.forEach(function (c) {
+          lines.push(c + "：" + money(s.byCat[c] || 0));
+        });
+        lines.push("");
+        lines.push("—— 支出明細 ——");
+        if (!state.current.expenses.length) {
+          lines.push("（無）");
+        } else {
+          state.current.expenses
+            .slice()
+            .sort(function (a, b) { return a.date < b.date ? -1 : 1; })
+            .forEach(function (e, i) {
+              lines.push(
+                (i + 1) + ". [" + e.date + "] " + money(e.amount) +
+                " · " + e.category + " · " + personName(e.payer) +
+                (e.note ? " — " + e.note : "")
+              );
+            });
+        }
+        lines.push("");
+        lines.push("匯出時間：" + new Date().toLocaleString("zh-Hant"));
+        downloadBlob(
+          "homesplit-summary-" + state.current.label + ".txt",
+          lines.join("\n"),
+          "text/plain;charset=utf-8"
+        );
+        toast("已匯出 TXT 摘要");
+      }
+
+      function importJSON(file) {
+        var reader = new FileReader();
+        reader.onload = function () {
+          try {
+            var text = reader.result;
+            var data;
+            var name = (file.name || "").toLowerCase();
+            if (name.indexOf(".xml") !== -1 || String(text).trim().charAt(0) === "<") {
+              data = xmlToState(text);
+            } else {
+              data = JSON.parse(text);
+            }
+            if (!data || typeof data !== "object") throw new Error("格式錯誤");
+            if (!data.current || !Array.isArray(data.people)) {
+              throw new Error("缺少必要欄位（people / current）");
+            }
+            if (!confirm("匯入會覆蓋目前所有資料，確定繼續？")) return;
+            applyData(data, { keepTheme: true });
+            state.setupDone = true;
+            save();
+            resetExpenseForm();
+            closeModal("modal-data");
+            renderAll();
+            toast("資料已還原並準備同步至 GitHub");
+          } catch (err) {
+            toast("匯入失敗：" + (err.message || "無法解析檔案"));
+          }
+        };
+        reader.readAsText(file, "utf-8");
+      }
+
+      function exportXML() {
+        downloadBlob(
+          "homesplit-" + (state.current.label || "data") + ".xml",
+          stateToXml(payloadForRemote()),
+          "application/xml;charset=utf-8"
+        );
+        toast("已匯出 XML");
+      }
+
+      function clearAllData() {
+        if (!confirm("確定清除所有 HomeSplit 資料？此操作無法復原。")) return;
+        if (!confirm("再次確認：真的要清除全部資料嗎？")) return;
+        localStorage.removeItem(STORAGE_KEY);
+        var theme = state.theme;
+        var wipeRemote = githubCfg.token && confirm("同時把 GitHub 上的 JSON／XML 重設為空白範本？");
+        state = createEmptyState();
+        state.theme = theme;
+        save({ skipRemote: !wipeRemote });
+        closeModal("modal-data");
+        resetExpenseForm();
+        showScreen("screen-setup");
+        document.getElementById("btn-history").hidden = true;
+        toast(wipeRemote ? "已清除本機並寫回 GitHub" : "已清除本機資料（倉庫紀錄仍在，重新整理會讀回）");
+      }
+
+      // ---------- 列印摘要 ----------
+      function printSummary() {
+        var s = computeSummary();
+        document.getElementById("print-title").textContent =
+          state.kittyName + " — " + state.current.label + " 結算摘要";
+        var body = document.getElementById("print-body");
+        body.innerHTML =
+          "<p>貨幣：" + escapeHtml(state.currency) +
+          "｜參與者：" + escapeHtml(state.people[0].name) + "、" +
+          escapeHtml(state.people[1].name) + "</p>" +
+          '<div class="card">' +
+            "<p>家庭總收入：" + escapeHtml(money(s.income)) + "</p>" +
+            "<p>總支出：" + escapeHtml(money(s.totalSpent)) + "</p>" +
+            "<p>本月淨收支：" + escapeHtml(money(s.net)) + "</p>" +
+            "<p>夾錢：" + escapeHtml(money(s.pool)) +
+            "（剩餘 " + escapeHtml(money(s.poolRemain)) + "）</p>" +
+            "<p><strong>" + escapeHtml(settlementText(s)) + "</strong></p>" +
+          "</div>" +
+          '<div class="card" style="margin-top:1rem;">' +
+            "<h3>分類</h3>" +
+            CATEGORIES.map(function (c) {
+              return "<p>" + escapeHtml(c) + "：" + escapeHtml(money(s.byCat[c] || 0)) + "</p>";
+            }).join("") +
+          "</div>" +
+          '<div class="card" style="margin-top:1rem;">' +
+            "<h3>支出明細</h3>" +
+            (state.current.expenses.length
+              ? "<ul>" + state.current.expenses
+                  .slice()
+                  .sort(function (a, b) { return a.date < b.date ? -1 : 1; })
+                  .map(function (e) {
+                    return "<li>" + escapeHtml(e.date) + " · " +
+                      escapeHtml(money(e.amount)) + " · " +
+                      escapeHtml(e.category) + " · " +
+                      escapeHtml(personName(e.payer)) +
+                      (e.note ? " — " + escapeHtml(e.note) : "") +
+                      "</li>";
+                  }).join("") + "</ul>"
+              : "<p>（無支出）</p>") +
+          "</div>";
+
+        // 暫時顯示 print section，列印後還原
+        var printSec = document.getElementById("screen-print");
+        printSec.classList.add("active");
+        printSec.style.display = "block";
+        window.print();
+        printSec.classList.remove("active");
+        printSec.style.display = "";
+      }
+
+      // ---------- 事件綁定 ----------
+      function bindEvents() {
+        // Setup
+        document.getElementById("form-setup").addEventListener("submit", function (ev) {
+          ev.preventDefault();
+          githubCfg.owner = document.getElementById("setup-gh-owner").value.trim() || DEFAULT_REPO.owner;
+          githubCfg.repo = document.getElementById("setup-gh-repo").value.trim() || DEFAULT_REPO.repo;
+          githubCfg.token = document.getElementById("setup-gh-token").value.trim();
+          saveGithubCfg();
+          fillGithubForm();
+          state.kittyName = document.getElementById("kitty-name").value.trim() || "家庭收支";
+          state.currency = document.getElementById("currency").value;
+          state.people[0].name = document.getElementById("person-a").value.trim() || "你";
+          state.people[1].name = document.getElementById("person-b").value.trim() || "另一半";
+          state.setupDone = true;
+          if (!state.current || !state.current.label) state.current = createMonth();
+          save();
+          resetExpenseForm();
+          renderAll();
+          toast("Kitty「" + state.kittyName + "」已建立");
+          if (githubCfg.token) {
+            pushToGithub().then(function (ok) {
+              if (ok) toast("已寫入 GitHub JSON／XML，另一半重新整理即可讀取");
+            });
+          } else {
+            toast("未填 Token：可自動讀取公開倉庫，但無法寫入。請到「資料」設定。");
+          }
+        });
+
+        // Income / pool（即時儲存）
+        ["income", "pool"].forEach(function (id) {
+          document.getElementById(id).addEventListener("change", function () {
+            var v = parseFloat(this.value);
+            state.current[id] = isFinite(v) && v >= 0 ? round2(v) : 0;
+            save();
+            renderStats();
+            renderSettlePreview();
+          });
+        });
+
+        // Add / update expense
+        document.getElementById("form-expense").addEventListener("submit", function (ev) {
+          ev.preventDefault();
+          var amount = parseFloat(document.getElementById("exp-amount").value);
+          if (!isFinite(amount) || amount <= 0) {
+            toast("請輸入有效金額");
+            return;
+          }
+          var payload = {
+            amount: round2(amount),
+            category: document.getElementById("exp-category").value,
+            payer: document.getElementById("exp-payer").value,
+            date: document.getElementById("exp-date").value || todayISO(),
+            note: document.getElementById("exp-note").value.trim()
+          };
+          var editId = document.getElementById("exp-edit-id").value;
+          if (editId) {
+            var idx = state.current.expenses.findIndex(function (e) { return e.id === editId; });
+            if (idx >= 0) {
+              state.current.expenses[idx] = Object.assign({}, state.current.expenses[idx], payload);
+              toast("支出已更新");
+            }
+          } else {
+            state.current.expenses.push(Object.assign({ id: uid() }, payload));
+            toast("已加入支出");
+          }
+          save();
+          resetExpenseForm();
+          renderExpenseList();
+          renderStats();
+          renderSettlePreview();
+        });
+
+        document.getElementById("btn-cancel-edit").addEventListener("click", resetExpenseForm);
+
+        // Expense list actions（事件委派）
+        document.getElementById("expense-list").addEventListener("click", function (ev) {
+          var btn = ev.target.closest("[data-action]");
+          if (!btn) return;
+          var item = btn.closest(".expense-item");
+          if (!item) return;
+          var id = item.getAttribute("data-id");
+          if (btn.getAttribute("data-action") === "edit") startEditExpense(id);
+          if (btn.getAttribute("data-action") === "delete") deleteExpense(id);
+        });
+
+        document.getElementById("filter-payer").addEventListener("change", renderExpenseList);
+
+        // Theme
+        document.getElementById("btn-theme").addEventListener("click", function () {
+          state.theme = state.theme === "dark" ? "light" : "dark";
+          applyTheme();
+          save();
+        });
+
+        // Nav
+        document.getElementById("btn-data").addEventListener("click", function () {
+          fillGithubForm();
+          openModal("modal-data");
+        });
+        document.getElementById("btn-history").addEventListener("click", function () {
+          renderHistory();
+          showScreen("screen-history");
+        });
+        document.getElementById("btn-back-dash").addEventListener("click", function () {
+          showScreen("screen-dash");
+        });
+
+        // Edit kitty
+        document.getElementById("btn-edit-kitty").addEventListener("click", function () {
+          document.getElementById("edit-name").value = state.kittyName;
+          document.getElementById("edit-currency").value = state.currency;
+          document.getElementById("edit-person-a").value = state.people[0].name;
+          document.getElementById("edit-person-b").value = state.people[1].name;
+          openModal("modal-edit-kitty");
+        });
+        document.getElementById("form-edit-kitty").addEventListener("submit", function (ev) {
+          ev.preventDefault();
+          state.kittyName = document.getElementById("edit-name").value.trim() || "家庭收支";
+          state.currency = document.getElementById("edit-currency").value;
+          state.people[0].name = document.getElementById("edit-person-a").value.trim() || "你";
+          state.people[1].name = document.getElementById("edit-person-b").value.trim() || "另一半";
+          save();
+          closeModal("modal-edit-kitty");
+          renderAll();
+          toast("設定已更新");
+        });
+
+        // Settle
+        function openSettleModal() {
+          var s = computeSummary();
+          document.getElementById("settle-modal-body").innerHTML = buildSettleHtml(s);
+          openModal("modal-settle");
+        }
+        document.getElementById("btn-settle").addEventListener("click", openSettleModal);
+        document.getElementById("btn-open-settle").addEventListener("click", openSettleModal);
+        document.getElementById("btn-confirm-settle").addEventListener("click", confirmSettle);
+        document.getElementById("btn-print-summary").addEventListener("click", printSummary);
+
+        // Data management
+        document.getElementById("btn-export-json").addEventListener("click", exportJSON);
+        document.getElementById("btn-export-xml").addEventListener("click", exportXML);
+        document.getElementById("btn-export-txt").addEventListener("click", exportTXT);
+        document.getElementById("btn-import-json").addEventListener("click", function () {
+          document.getElementById("import-file").click();
+        });
+        document.getElementById("import-file").addEventListener("change", function () {
+          var file = this.files && this.files[0];
+          if (file) importJSON(file);
+          this.value = "";
+        });
+        document.getElementById("btn-clear-all").addEventListener("click", clearAllData);
+
+        document.getElementById("form-github").addEventListener("submit", function (ev) {
+          ev.preventDefault();
+          githubCfg.owner = document.getElementById("gh-owner").value.trim() || DEFAULT_REPO.owner;
+          githubCfg.repo = document.getElementById("gh-repo").value.trim() || DEFAULT_REPO.repo;
+          githubCfg.branch = document.getElementById("gh-branch").value.trim() || "main";
+          githubCfg.jsonPath = document.getElementById("gh-json-path").value.trim() || DEFAULT_REPO.jsonPath;
+          githubCfg.xmlPath = document.getElementById("gh-xml-path").value.trim() || DEFAULT_REPO.xmlPath;
+          githubCfg.token = document.getElementById("gh-token").value.trim();
+          saveGithubCfg();
+          fillGithubForm();
+          toast("GitHub 連線設定已儲存在本機");
+          pullFromGithub().then(function (result) {
+            if (result && result.applied) {
+              resetExpenseForm();
+              if (state.setupDone) renderAll();
+            }
+            startGithubPolling();
+            if (githubCfg.token && state.setupDone) pushToGithub();
+          });
+        });
+        document.getElementById("btn-gh-pull").addEventListener("click", function () {
+          pullFromGithub().then(function (result) {
+            if (result && result.applied) {
+              resetExpenseForm();
+              if (state.setupDone) renderAll();
+              else showScreen("screen-setup");
+            }
+          });
+        });
+        document.getElementById("btn-gh-push").addEventListener("click", function () {
+          if (!state.setupDone) {
+            toast("請先建立 Kitty 再寫入");
+            return;
+          }
+          if (!githubCfg.token) {
+            toast("寫入需要 GitHub Token");
+            return;
+          }
+          save({ skipRemote: true });
+          pushToGithub();
+        });
+
+        // History detail
+        document.getElementById("history-list").addEventListener("click", function (ev) {
+          var btn = ev.target.closest('[data-action="view-history"]');
+          if (!btn) return;
+          var item = btn.closest(".history-item");
+          var id = item && item.getAttribute("data-id");
+          var m = state.history.find(function (h) { return h.id === id; });
+          if (!m) return;
+          var s = m.settlement || computeSummary(m);
+          document.getElementById("history-detail-title").textContent = m.label + " 詳情";
+          document.getElementById("history-detail-body").innerHTML =
+            "<p>月份 <strong>" + escapeHtml(m.label) + "</strong>" +
+            (m.settledAt ? " · 結算於 " + escapeHtml(m.settledAt.slice(0, 10)) : "") +
+            " · " + (m.expenses ? m.expenses.length : 0) + " 筆支出</p>" +
+            '<div class="settle-result">' +
+              "<h3>結算結果</h3>" +
+              "<p>家庭總收入：" + escapeHtml(money(s.income)) + "</p>" +
+              "<p>總支出：" + escapeHtml(money(s.totalSpent)) + "</p>" +
+              "<p>本月淨收支：<strong>" + escapeHtml(money(s.net)) + "</strong></p>" +
+              "<p>夾錢剩餘：" + escapeHtml(money(s.poolRemain)) + "</p>" +
+              "<p><strong>" + escapeHtml(settlementText(s)) + "</strong></p>" +
+            "</div>" +
+            "<p style='margin-top:0.85rem;font-size:0.9rem;color:var(--text-secondary);'>" +
+              escapeHtml(state.people[0].name) + "：" + escapeHtml(money(s.spentA)) +
+              " · " + escapeHtml(state.people[1].name) + "：" + escapeHtml(money(s.spentB)) +
+            "</p>";
+          openModal("modal-history-detail");
+        });
+
+        // Modal close
+        document.querySelectorAll("[data-close]").forEach(function (btn) {
+          btn.addEventListener("click", function () {
+            closeModal(btn.getAttribute("data-close"));
+          });
+        });
+        document.querySelectorAll(".modal-backdrop").forEach(function (backdrop) {
+          backdrop.addEventListener("click", function (ev) {
+            if (ev.target === backdrop) backdrop.classList.remove("open");
+          });
+        });
+        document.addEventListener("keydown", function (ev) {
+          if (ev.key === "Escape") {
+            document.querySelectorAll(".modal-backdrop.open").forEach(function (m) {
+              m.classList.remove("open");
+            });
+          }
+        });
+      }
+
+      // ---------- 啟動 ----------
+      function init() {
+        loadGithubCfg();
+        load();
+        applyTheme();
+        bindEvents();
+        fillGithubForm();
+        document.getElementById("exp-date").value = todayISO();
+        if (state.setupDone) renderAll();
+        else showScreen("screen-setup");
+        setSyncStatus("busy", "準備讀取 GitHub…");
+        pullFromGithub().then(function (result) {
+          if (result && result.applied) {
+            resetExpenseForm();
+            if (state.setupDone) renderAll();
+            else showScreen("screen-setup");
+          } else if (state.setupDone && githubCfg.token) {
+            scheduleGithubPush();
+          }
+          startGithubPolling();
+        });
+        document.addEventListener("visibilitychange", function () {
+          if (!document.hidden) pullFromGithub({ silent: true }).then(function (result) {
+            if (result && result.applied) {
+              resetExpenseForm();
+              if (state.setupDone) renderAll();
+            }
+          });
+        });
+      }
+
+      if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", init);
+      } else {
+        init();
+      }
+    })();
+  </script>
+</body>
+</html>

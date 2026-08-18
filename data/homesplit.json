@@ -1,0 +1,20 @@
+{
+  "setupDone": false,
+  "kittyName": "家庭收支",
+  "currency": "HKD",
+  "people": [
+    { "id": "a", "name": "你" },
+    { "id": "b", "name": "另一半" }
+  ],
+  "current": {
+    "id": "bootstrap",
+    "label": "2026-08",
+    "income": 0,
+    "pool": 0,
+    "expenses": [],
+    "settlement": null,
+    "settledAt": null
+  },
+  "history": [],
+  "updatedAt": null
+}
