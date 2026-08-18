@@ -1,13 +1,19 @@
 {
-  "setupDone": false,
+  "setupDone": true,
   "kittyName": "家庭收支",
   "currency": "HKD",
   "people": [
-    { "id": "a", "name": "你" },
-    { "id": "b", "name": "另一半" }
+    {
+      "id": "a",
+      "name": "Tong"
+    },
+    {
+      "id": "b",
+      "name": "Momo"
+    }
   ],
   "current": {
-    "id": "bootstrap",
+    "id": "id_msyss6vb_9wuif8",
     "label": "2026-08",
     "income": 0,
     "pool": 0,
@@ -16,5 +22,5 @@
     "settledAt": null
   },
   "history": [],
-  "updatedAt": null
+  "updatedAt": "2026-08-18T15:08:48.811Z"
 }
