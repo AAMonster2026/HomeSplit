@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<homesplit setupDone="true" kittyName="家庭收支" currency="HKD" updatedAt="2026-08-18T15:11:48.148Z">
+<homesplit setupDone="true" kittyName="家庭收支" currency="HKD" updatedAt="2026-08-18T15:11:49.366Z">
   <people>
     <person id="a" name="Tong"/>
     <person id="b" name="Momo"/>
