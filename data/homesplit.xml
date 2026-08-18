@@ -1,11 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<homesplit setupDone="true" kittyName="家庭收支" currency="HKD" updatedAt="2026-08-18T15:08:48.811Z">
+<homesplit setupDone="true" kittyName="家庭收支" currency="HKD" updatedAt="2026-08-18T15:09:12.149Z">
   <people>
     <person id="a" name="Tong"/>
     <person id="b" name="Momo"/>
   </people>
   <current id="id_msyss6vb_9wuif8" label="2026-08" income="0" pool="0" settledAt="">
     <expenses>
+      <expense id="id_msyst3dh_qpdxhr" amount="580" date="2026-08-17" category="日常用品" payer="b" note="Francfranc餐具"/>
     </expenses>
   </current>
   <history>
