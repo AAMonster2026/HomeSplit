@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<homesplit setupDone="false" kittyName="家庭收支" currency="HKD" updatedAt="">
+  <people>
+    <person id="a" name="你"/>
+    <person id="b" name="另一半"/>
+  </people>
+  <current id="bootstrap" label="2026-08" income="0" pool="0" settledAt="">
+    <expenses/>
+  </current>
+  <history/>
+</homesplit>
