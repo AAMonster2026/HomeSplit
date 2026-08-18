@@ -25,11 +25,19 @@
         "payer": "b",
         "date": "2026-08-17",
         "note": "Francfranc餐具"
+      },
+      {
+        "id": "id_msyt6b6l_6ebx60",
+        "amount": 1300,
+        "category": "日常用品",
+        "payer": "b",
+        "date": "2026-08-18",
+        "note": "SaraHome"
       }
     ],
     "settlement": null,
     "settledAt": null
   },
   "history": [],
-  "updatedAt": "2026-08-18T15:11:49.366Z"
+  "updatedAt": "2026-08-18T15:19:28.797Z"
 }
