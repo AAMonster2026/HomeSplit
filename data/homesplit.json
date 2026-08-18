@@ -17,10 +17,19 @@
     "label": "2026-08",
     "income": 0,
     "pool": 0,
-    "expenses": [],
+    "expenses": [
+      {
+        "id": "id_msyst3dh_qpdxhr",
+        "amount": 580,
+        "category": "日常用品",
+        "payer": "b",
+        "date": "2026-08-17",
+        "note": "Francfranc餐具"
+      }
+    ],
     "settlement": null,
     "settledAt": null
   },
   "history": [],
-  "updatedAt": "2026-08-18T15:08:48.811Z"
+  "updatedAt": "2026-08-18T15:09:12.149Z"
 }
