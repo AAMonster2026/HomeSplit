@@ -33,11 +33,19 @@
         "payer": "b",
         "date": "2026-08-18",
         "note": "SaraHome"
+      },
+      {
+        "id": "id_mt4883wd_23dtah",
+        "amount": 73,
+        "category": "膳食",
+        "payer": "a",
+        "date": "2026-08-22",
+        "note": "Aeon晚飯"
       }
     ],
     "settlement": null,
     "settledAt": null
   },
   "history": [],
-  "updatedAt": "2026-08-18T15:19:28.797Z"
+  "updatedAt": "2026-08-22T10:19:37.789Z"
 }
