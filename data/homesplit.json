@@ -41,11 +41,19 @@
         "payer": "a",
         "date": "2026-08-22",
         "note": "Aeon晚飯"
+      },
+      {
+        "id": "id_mt56akap_nmdjb8",
+        "amount": 92,
+        "category": "膳食",
+        "payer": "a",
+        "date": "2026-08-23",
+        "note": "Breakfast"
       }
     ],
     "settlement": null,
     "settledAt": null
   },
   "history": [],
-  "updatedAt": "2026-08-22T10:19:37.789Z"
+  "updatedAt": "2026-08-23T02:13:19.297Z"
 }
