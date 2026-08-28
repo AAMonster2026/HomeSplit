@@ -49,11 +49,19 @@
         "payer": "a",
         "date": "2026-08-23",
         "note": "Breakfast"
+      },
+      {
+        "id": "id_mtcx80uh_yojtrz",
+        "amount": 160,
+        "category": "膳食",
+        "payer": "a",
+        "date": "2026-08-28",
+        "note": "一田dinner"
       }
     ],
     "settlement": null,
     "settledAt": null
   },
   "history": [],
-  "updatedAt": "2026-08-23T02:13:19.297Z"
+  "updatedAt": "2026-08-28T12:21:33.641Z"
 }
