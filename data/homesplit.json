@@ -57,11 +57,19 @@
         "payer": "a",
         "date": "2026-08-28",
         "note": "一田dinner"
+      },
+      {
+        "id": "id_mtdvuvqa_ygkdj6",
+        "amount": 156,
+        "category": "日常用品",
+        "payer": "a",
+        "date": "2026-08-29",
+        "note": "無印良品廚房用具"
       }
     ],
     "settlement": null,
     "settledAt": null
   },
   "history": [],
-  "updatedAt": "2026-08-28T12:21:33.641Z"
+  "updatedAt": "2026-08-29T04:31:07.042Z"
 }
