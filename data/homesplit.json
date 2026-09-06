@@ -65,11 +65,19 @@
         "payer": "a",
         "date": "2026-08-29",
         "note": "無印良品廚房用具"
+      },
+      {
+        "id": "id_mtp79drm_fdst1a",
+        "amount": 130,
+        "category": "膳食",
+        "payer": "a",
+        "date": "2026-09-05",
+        "note": "Cook dinner"
       }
     ],
     "settlement": null,
     "settledAt": null
   },
   "history": [],
-  "updatedAt": "2026-08-29T04:31:07.042Z"
+  "updatedAt": "2026-09-06T02:35:47.314Z"
 }
