@@ -73,11 +73,19 @@
         "payer": "a",
         "date": "2026-09-05",
         "note": "Cook dinner"
+      },
+      {
+        "id": "id_mtp79w82_5z42bi",
+        "amount": 90,
+        "category": "膳食",
+        "payer": "a",
+        "date": "2026-09-06",
+        "note": "Breakfast novowalk"
       }
     ],
     "settlement": null,
     "settledAt": null
   },
   "history": [],
-  "updatedAt": "2026-09-06T02:35:47.314Z"
+  "updatedAt": "2026-09-06T02:36:11.235Z"
 }
