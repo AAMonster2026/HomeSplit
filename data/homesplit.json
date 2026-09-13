@@ -81,11 +81,19 @@
         "payer": "a",
         "date": "2026-09-06",
         "note": "Breakfast novowalk"
+      },
+      {
+        "id": "id_mtz7yin8_ggjm2g",
+        "amount": 184,
+        "category": "膳食",
+        "payer": "a",
+        "date": "2026-09-12",
+        "note": "Dinner+榴連"
       }
     ],
     "settlement": null,
     "settledAt": null
   },
   "history": [],
-  "updatedAt": "2026-09-06T02:36:11.235Z"
+  "updatedAt": "2026-09-13T02:53:01.796Z"
 }
