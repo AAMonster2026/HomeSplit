@@ -89,11 +89,19 @@
         "payer": "a",
         "date": "2026-09-12",
         "note": "Dinner+榴連"
+      },
+      {
+        "id": "id_mtz7ytom_jaavmi",
+        "amount": 88,
+        "category": "膳食",
+        "payer": "a",
+        "date": "2026-09-13",
+        "note": "早餐"
       }
     ],
     "settlement": null,
     "settledAt": null
   },
   "history": [],
-  "updatedAt": "2026-09-13T02:53:01.796Z"
+  "updatedAt": "2026-09-13T02:53:16.103Z"
 }
