@@ -121,11 +121,19 @@
         "payer": "a",
         "date": "2026-09-26",
         "note": "一田/Aeon 晚餐"
+      },
+      {
+        "id": "id_mukmot31_lcsqao",
+        "amount": 89,
+        "category": "膳食",
+        "payer": "a",
+        "date": "2026-09-27",
+        "note": "早餐意樂"
       }
     ],
     "settlement": null,
     "settledAt": null
   },
   "history": [],
-  "updatedAt": "2026-09-28T02:28:03.246Z"
+  "updatedAt": "2026-09-28T02:28:32.701Z"
 }
