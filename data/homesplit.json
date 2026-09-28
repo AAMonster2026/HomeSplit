@@ -113,11 +113,19 @@
         "payer": "a",
         "date": "2026-09-26",
         "note": "早餐mac 意樂"
+      },
+      {
+        "id": "id_mukmo6cu_li1o2s",
+        "amount": 160,
+        "category": "膳食",
+        "payer": "a",
+        "date": "2026-09-26",
+        "note": "一田/Aeon 晚餐"
       }
     ],
     "settlement": null,
     "settledAt": null
   },
   "history": [],
-  "updatedAt": "2026-09-28T02:26:55.665Z"
+  "updatedAt": "2026-09-28T02:28:03.246Z"
 }
