@@ -129,11 +129,19 @@
         "payer": "a",
         "date": "2026-09-27",
         "note": "早餐意樂"
+      },
+      {
+        "id": "id_mv1ndn7n_n9wig0",
+        "amount": 70,
+        "category": "膳食",
+        "payer": "a",
+        "date": "2026-10-09",
+        "note": "Dinner惠康"
       }
     ],
     "settlement": null,
     "settledAt": null
   },
   "history": [],
-  "updatedAt": "2026-09-28T02:28:32.701Z"
+  "updatedAt": "2026-10-10T00:19:56.483Z"
 }
