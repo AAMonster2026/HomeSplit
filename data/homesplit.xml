@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<homesplit setupDone="true" kittyName="家庭收支" currency="HKD" updatedAt="2026-10-10T00:19:56.483Z">
+<homesplit setupDone="true" kittyName="家庭收支" currency="HKD" updatedAt="2026-10-10T00:20:53.319Z">
   <people>
     <person id="a" name="Tong"/>
     <person id="b" name="Momo"/>
@@ -21,6 +21,8 @@
       <expense id="id_mukmo6cu_li1o2s" amount="160" date="2026-09-26" category="膳食" payer="a" note="一田/Aeon 晚餐"/>
       <expense id="id_mukmot31_lcsqao" amount="89" date="2026-09-27" category="膳食" payer="a" note="早餐意樂"/>
       <expense id="id_mv1ndn7n_n9wig0" amount="70" date="2026-10-09" category="膳食" payer="a" note="Dinner惠康"/>
+      <expense id="id_mv1ndzft_78vbaz" amount="91" date="2026-10-10" category="膳食" payer="a" note="早餐"/>
+      <expense id="id_mv1nev2f_e98w7q" amount="467" date="2026-10-10" category="月費" payer="a" note="電費7-9月"/>
     </expenses>
   </current>
   <history>
