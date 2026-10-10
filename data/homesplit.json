@@ -137,11 +137,27 @@
         "payer": "a",
         "date": "2026-10-09",
         "note": "Dinner惠康"
+      },
+      {
+        "id": "id_mv1ndzft_78vbaz",
+        "amount": 91,
+        "category": "膳食",
+        "payer": "a",
+        "date": "2026-10-10",
+        "note": "早餐"
+      },
+      {
+        "id": "id_mv1nev2f_e98w7q",
+        "amount": 467,
+        "category": "月費",
+        "payer": "a",
+        "date": "2026-10-10",
+        "note": "電費7-9月"
       }
     ],
     "settlement": null,
     "settledAt": null
   },
   "history": [],
-  "updatedAt": "2026-10-10T00:19:56.483Z"
+  "updatedAt": "2026-10-10T00:20:53.319Z"
 }
