@@ -1,0 +1,1034 @@
+<script>
+(function () {
+  "use strict";
+
+  var CACHE_KEY = "homesplit_sheet_cache";
+  var THEME_KEY = "homesplit_theme";
+  var WHO_KEY = "homesplit_who";
+  var POLL_MS = 8000;
+  var CATEGORIES = ["膳食", "日常用品", "月費", "其他"];
+  var CATEGORY_TAG = { "膳食": "food", "日常用品": "daily", "月費": "fee", "其他": "other" };
+  var SCREENS = ["screen-loading", "screen-error", "screen-setup", "screen-dash", "screen-history"];
+
+  var state = emptyState();
+  var view = "screen-loading";
+  var saving = 0;
+  var pullGen = 0;
+  var pollTimer = null;
+
+  function emptyState() {
+    return {
+      setupDone: false,
+      kittyName: "家庭收支",
+      currency: "HKD",
+      people: [{ id: "a", name: "你" }, { id: "b", name: "另一半" }],
+      current: emptyMonth(),
+      history: [],
+      theme: "light",
+      updatedAt: "",
+      revision: 0,
+      spreadsheetUrl: "",
+      detailUrl: ""
+    };
+  }
+
+  function emptyMonth() {
+    return { id: "", label: "", income: 0, pool: 0, expenses: [], settlement: null, settledAt: null };
+  }
+
+  function $(id) { return document.getElementById(id); }
+
+  function uid() {
+    return "id_" + Date.now().toString(36) + "_" + Math.random().toString(36).slice(2, 8);
+  }
+
+  function todayISO() {
+    var d = new Date();
+    return d.getFullYear() + "-" +
+      String(d.getMonth() + 1).padStart(2, "0") + "-" +
+      String(d.getDate()).padStart(2, "0");
+  }
+
+  function round2(n) {
+    return Math.round((Number(n) + Number.EPSILON) * 100) / 100;
+  }
+
+  function escapeHtml(str) {
+    return String(str)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  }
+
+  function xmlEscape(str) {
+    return escapeHtml(str);
+  }
+
+  function personName(id) {
+    var people = state.people || [];
+    for (var i = 0; i < people.length; i++) {
+      if (people[i].id === id) return people[i].name;
+    }
+    return id === "b" ? "另一半" : "你";
+  }
+
+  function money(n) {
+    var num = Number(n) || 0;
+    var digits = state.currency === "JPY" ? 0 : 2;
+    try {
+      return new Intl.NumberFormat("zh-Hant", {
+        style: "currency",
+        currency: state.currency || "HKD",
+        minimumFractionDigits: digits,
+        maximumFractionDigits: digits
+      }).format(num);
+    } catch (err) {
+      return (state.currency || "HKD") + " " + num.toFixed(digits);
+    }
+  }
+
+  function toast(msg) {
+    var host = $("toast-host");
+    if (!host) return;
+    var el = document.createElement("div");
+    el.className = "toast";
+    el.textContent = msg;
+    host.appendChild(el);
+    setTimeout(function () {
+      el.style.opacity = "0";
+      el.style.transition = "opacity 0.3s";
+      setTimeout(function () { el.remove(); }, 300);
+    }, 2800);
+  }
+
+  function downloadBlob(filename, content, mime) {
+    var blob = new Blob([content], { type: mime || "text/plain;charset=utf-8" });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  }
+
+  function call(name, payload) {
+    return new Promise(function (resolve, reject) {
+      if (typeof google === "undefined" || !google.script || !google.script.run) {
+        reject(new Error("請用 Google Apps Script 網頁，或本機預覽伺服器開啟"));
+        return;
+      }
+      var runner = google.script.run
+        .withSuccessHandler(resolve)
+        .withFailureHandler(function (err) {
+          reject(new Error(err && err.message ? err.message : "連線失敗"));
+        });
+      if (payload === undefined) runner[name]();
+      else runner[name](payload);
+    });
+  }
+
+  function setSync(kind, text) {
+    var pill = $("sync-status");
+    var label = $("sync-status-text");
+    if (!pill || !label) return;
+    pill.className = "sync-pill" + (kind ? " " + kind : "");
+    label.textContent = text;
+    pill.title = text;
+  }
+
+  function setConnected(on) {
+    document.body.classList.toggle("is-offline", !on);
+  }
+
+  function applyTheme() {
+    var theme = localStorage.getItem(THEME_KEY) === "dark" ? "dark" : "light";
+    state.theme = theme;
+    document.documentElement.setAttribute("data-theme", theme);
+  }
+
+  function applyState(data) {
+    state = Object.assign(emptyState(), data || {});
+    if (!state.current || !Array.isArray(state.current.expenses)) state.current = emptyMonth();
+    if (!Array.isArray(state.history)) state.history = [];
+    if (!Array.isArray(state.people) || state.people.length < 2) {
+      state.people = [{ id: "a", name: "你" }, { id: "b", name: "另一半" }];
+    }
+    applyTheme();
+  }
+
+  function signature(data) {
+    if (!data) return "";
+    return JSON.stringify({
+      setupDone: data.setupDone,
+      kittyName: data.kittyName,
+      currency: data.currency,
+      people: data.people,
+      current: data.current,
+      history: data.history,
+      revision: data.revision,
+      updatedAt: data.updatedAt
+    });
+  }
+
+  function expenseIdMap(data) {
+    var map = {};
+    var expenses = data && data.current && data.current.expenses ? data.current.expenses : [];
+    expenses.forEach(function (expense) { map[expense.id] = true; });
+    return map;
+  }
+
+  function writeCache() {
+    try { localStorage.setItem(CACHE_KEY, JSON.stringify(state)); } catch (err) {}
+  }
+
+  function readCache() {
+    try {
+      var raw = localStorage.getItem(CACHE_KEY);
+      return raw ? JSON.parse(raw) : null;
+    } catch (err) {
+      return null;
+    }
+  }
+
+  function showScreen(id) {
+    view = id;
+    SCREENS.forEach(function (sid) {
+      var el = $(sid);
+      if (el) el.classList.toggle("active", sid === id);
+    });
+    var nav = id === "screen-dash" || id === "screen-history";
+    $("btn-history").hidden = !nav;
+  }
+
+  function openModal(id) { var el = $(id); if (el) el.classList.add("open"); }
+  function closeModal(id) { var el = $(id); if (el) el.classList.remove("open"); }
+
+  function computeSummary(month) {
+    month = month || state.current;
+    var expenses = month.expenses || [];
+    var spentA = 0;
+    var spentB = 0;
+    var byCat = {};
+    CATEGORIES.forEach(function (c) { byCat[c] = 0; });
+    expenses.forEach(function (e) {
+      var amt = Number(e.amount) || 0;
+      if (e.payer === "b") spentB += amt;
+      else spentA += amt;
+      if (byCat[e.category] !== undefined) byCat[e.category] += amt;
+      else byCat["其他"] += amt;
+    });
+    spentA = round2(spentA);
+    spentB = round2(spentB);
+    CATEGORIES.forEach(function (c) { byCat[c] = round2(byCat[c]); });
+    var totalSpent = round2(spentA + spentB);
+    var income = round2(month.income || 0);
+    var pool = round2(month.pool || 0);
+    var fairShare = round2(totalSpent / 2);
+    var balance = round2(spentA - fairShare);
+    var debtor = null;
+    var creditor = null;
+    var oweAmount = 0;
+    if (balance > 0.004) {
+      debtor = "b"; creditor = "a"; oweAmount = balance;
+    } else if (balance < -0.004) {
+      debtor = "a"; creditor = "b"; oweAmount = Math.abs(balance);
+    }
+    return {
+      spentA: spentA, spentB: spentB, totalSpent: totalSpent, byCat: byCat,
+      income: income, pool: pool, poolRemain: round2(pool - totalSpent),
+      net: round2(income - totalSpent), fairShare: fairShare, balance: balance,
+      debtor: debtor, creditor: creditor, oweAmount: round2(oweAmount)
+    };
+  }
+
+  function displaySummary(month) {
+    var live = computeSummary(month);
+    if (!month || !month.settlement) return live;
+    return Object.assign({}, live, month.settlement, { byCat: live.byCat });
+  }
+
+  function settlementText(summary) {
+    if (!summary.debtor) return "兩人支出剛好平衡，無需轉帳。";
+    return personName(summary.debtor) + " 應支付 " + money(summary.oweAmount) + " 給 " + personName(summary.creditor);
+  }
+
+  function renderAll() {
+    applyTheme();
+    updateSheetLinks();
+    if (!state.setupDone) {
+      showScreen("screen-setup");
+      return;
+    }
+    if (view !== "screen-history") showScreen("screen-dash");
+    else showScreen("screen-history");
+    renderDashHeader();
+    renderIncomeFields();
+    renderPeopleSelects();
+    renderExpenseList();
+    renderStats();
+    renderSettlePreview();
+    if (view === "screen-history") renderHistory();
+    var dateEl = $("exp-date");
+    if (dateEl && !dateEl.value) dateEl.value = todayISO();
+  }
+
+  function isPreviewSheet(url) {
+    return String(url || "").indexOf("/d/sheet_") >= 0;
+  }
+
+  function bindPreviewSheetLink(el) {
+    if (!el) return;
+    el.addEventListener("click", function (event) {
+      if (!isPreviewSheet(state.spreadsheetUrl) && !isPreviewSheet(el.getAttribute("href"))) return;
+      event.preventDefault();
+      toast("本機預覽沒有真正的 Google 試算表。部署網頁應用程式後，這個連結會打開你的試算表與明細。");
+    });
+  }
+
+  function updateSheetLinks() {
+    var header = $("link-sheet-header");
+    var sheet = $("link-sheet");
+    var detail = $("link-detail");
+    var updated = $("sheet-updated");
+    if (header) {
+      if (state.spreadsheetUrl) {
+        header.href = state.spreadsheetUrl;
+        header.hidden = false;
+      } else header.hidden = true;
+    }
+    if (sheet) sheet.href = state.spreadsheetUrl || "#";
+    if (detail) detail.href = state.detailUrl || state.spreadsheetUrl || "#";
+    if (updated) {
+      updated.textContent = state.updatedAt
+        ? ("修訂 " + (state.revision || 0) + " · 更新 " + String(state.updatedAt).replace("T", " ").slice(0, 19))
+        : "尚未連線。";
+    }
+  }
+
+  function renderDashHeader() {
+    $("dash-heading").textContent = state.kittyName || "家庭收支";
+    $("pill-month").textContent = "本月 " + (state.current.label || "—");
+    $("pill-currency").textContent = state.currency || "HKD";
+    $("pill-people").textContent = state.people[0].name + " · " + state.people[1].name;
+  }
+
+  function renderIncomeFields() {
+    var income = $("income");
+    var pool = $("pool");
+    if (document.activeElement !== income) income.value = state.current.income ? state.current.income : "";
+    if (document.activeElement !== pool) pool.value = state.current.pool ? state.current.pool : "";
+  }
+
+  function renderPeopleSelects() {
+    var who = $("who-am-i");
+    var whoValue = (who && who.value) || localStorage.getItem(WHO_KEY) || "a";
+    if (who) {
+      who.innerHTML =
+        '<option value="a">' + escapeHtml(state.people[0].name) + "</option>" +
+        '<option value="b">' + escapeHtml(state.people[1].name) + "</option>";
+      who.value = whoValue === "b" ? "b" : "a";
+    }
+    var payer = $("exp-payer");
+    var payerValue = payer.value || whoValue;
+    payer.innerHTML =
+      '<option value="a">' + escapeHtml(state.people[0].name) + "</option>" +
+      '<option value="b">' + escapeHtml(state.people[1].name) + "</option>";
+    payer.value = payerValue === "b" ? "b" : "a";
+    var filter = $("filter-payer");
+    var filterValue = filter.value || "all";
+    filter.innerHTML =
+      '<option value="all">全部</option>' +
+      '<option value="a">' + escapeHtml(state.people[0].name) + "</option>" +
+      '<option value="b">' + escapeHtml(state.people[1].name) + "</option>";
+    filter.value = filterValue;
+  }
+
+  function renderExpenseList() {
+    var filter = $("filter-payer").value || "all";
+    var list = state.current.expenses.slice().sort(function (a, b) {
+      if (a.date !== b.date) return a.date < b.date ? 1 : -1;
+      return a.id < b.id ? 1 : -1;
+    });
+    if (filter !== "all") list = list.filter(function (e) { return e.payer === filter; });
+    $("expense-count").textContent = state.current.expenses.length
+      ? ("共 " + state.current.expenses.length + " 筆" + (filter !== "all" ? "（顯示 " + list.length + " 筆）" : ""))
+      : "尚無支出";
+    var host = $("expense-list");
+    if (!list.length) {
+      host.innerHTML = '<div class="empty-state"><strong>還沒有支出紀錄</strong>新增第一筆，開始分帳。</div>';
+      return;
+    }
+    host.innerHTML = list.map(function (e) {
+      var tagClass = CATEGORY_TAG[e.category] || "other";
+      return '<article class="expense-item" role="listitem" data-id="' + escapeHtml(e.id) + '">' +
+        '<div class="expense-main"><div class="expense-top">' +
+        '<span class="expense-amount">' + escapeHtml(money(e.amount)) + "</span>" +
+        (e.note ? '<span class="expense-desc">' + escapeHtml(e.note) + "</span>" : "") +
+        '</div><div class="expense-meta">' +
+        '<span class="tag ' + tagClass + '">' + escapeHtml(e.category) + "</span>" +
+        "<span>" + escapeHtml(personName(e.payer)) + " 付款</span>" +
+        "<span>" + escapeHtml(e.date) + "</span>" +
+        "</div></div>" +
+        '<div class="expense-actions">' +
+        '<button type="button" class="btn-icon needs-server" data-action="edit" title="編輯" aria-label="編輯">✎</button>' +
+        '<button type="button" class="btn-icon needs-server" data-action="delete" title="刪除" aria-label="刪除">🗑</button>' +
+        "</div></article>";
+    }).join("");
+  }
+
+  function renderStats() {
+    var s = computeSummary();
+    $("stat-grid").innerHTML =
+      '<div class="stat"><div class="stat-label">' + escapeHtml(state.people[0].name) + " 總支出</div>" +
+      '<div class="stat-value">' + escapeHtml(money(s.spentA)) + "</div></div>" +
+      '<div class="stat"><div class="stat-label">' + escapeHtml(state.people[1].name) + " 總支出</div>" +
+      '<div class="stat-value">' + escapeHtml(money(s.spentB)) + "</div></div>" +
+      '<div class="stat"><div class="stat-label">總支出</div><div class="stat-value">' + escapeHtml(money(s.totalSpent)) + "</div></div>" +
+      '<div class="stat"><div class="stat-label">夾錢剩餘</div><div class="stat-value ' + (s.poolRemain < 0 ? "negative" : "positive") + '">' +
+      escapeHtml(money(s.poolRemain)) + "</div></div>" +
+      '<div class="stat highlight"><div class="stat-label">應收／應付</div><div class="stat-value">' +
+      escapeHtml(settlementText(s)) + "</div></div>";
+    var maxCat = Math.max.apply(null, CATEGORIES.map(function (c) { return s.byCat[c] || 0; })) || 1;
+    $("category-bars").innerHTML = CATEGORIES.map(function (c) {
+      var amt = s.byCat[c] || 0;
+      var pct = Math.round((amt / maxCat) * 100);
+      return '<div class="cat-row"><span class="cat-name">' + escapeHtml(c) + "</span>" +
+        '<div class="cat-bar" data-cat="' + escapeHtml(c) + '"><span style="width:' + pct + '%"></span></div>' +
+        '<span class="cat-amt">' + escapeHtml(money(amt)) + "</span></div>";
+    }).join("");
+  }
+
+  function renderSettlePreview() {
+    var s = computeSummary();
+    $("settle-preview").innerHTML =
+      '<div class="stat-grid">' +
+      '<div class="stat"><div class="stat-label">家庭收入</div><div class="stat-value">' + escapeHtml(money(s.income)) + "</div></div>" +
+      '<div class="stat"><div class="stat-label">本月淨收支</div><div class="stat-value ' + (s.net < 0 ? "negative" : "positive") + '">' +
+      escapeHtml(money(s.net)) + "</div></div></div>" +
+      '<p style="margin:0.75rem 0 0;font-size:0.9rem;color:var(--text-secondary);">' + escapeHtml(settlementText(s)) + "</p>";
+  }
+
+  function renderHistory() {
+    var host = $("history-list");
+    if (!state.history.length) {
+      host.innerHTML = '<div class="empty-state"><strong>尚無歷史紀錄</strong>結算本月後，明細會出現在這裡。</div>';
+      return;
+    }
+    host.innerHTML = state.history.slice().reverse().map(function (m) {
+      var s = displaySummary(m);
+      return '<div class="history-item" data-id="' + escapeHtml(m.id) + '"><div><strong>' + escapeHtml(m.label) + "</strong>" +
+        "<span>總支出 " + escapeHtml(money(s.totalSpent)) + " · 淨收支 " + escapeHtml(money(s.net)) +
+        (m.settledAt ? " · 結算於 " + escapeHtml(String(m.settledAt).slice(0, 10)) : "") +
+        " · " + (m.expenses ? m.expenses.length : 0) + " 筆</span></div>" +
+        '<button type="button" class="btn btn-secondary btn-sm" data-action="view-history">查看明細</button></div>';
+    }).join("");
+  }
+
+  function expenseLines(expenses) {
+    var rows = (expenses || []).slice().sort(function (a, b) { return a.date < b.date ? -1 : 1; });
+    if (!rows.length) return "<p>（無支出）</p>";
+    return '<ol class="detail-lines">' + rows.map(function (e) {
+      return "<li>" + escapeHtml(e.date) + " · " + escapeHtml(money(e.amount)) + " · " +
+        escapeHtml(e.category) + " · " + escapeHtml(personName(e.payer)) +
+        (e.note ? " — " + escapeHtml(e.note) : "") + "</li>";
+    }).join("") + "</ol>";
+  }
+
+  function resetExpenseForm() {
+    $("form-expense").reset();
+    $("exp-date").value = todayISO();
+    $("exp-edit-id").value = "";
+    $("exp-expected-updated").value = "";
+    $("exp-new-id").value = "";
+    $("btn-add-expense").textContent = "加入支出";
+    $("btn-cancel-edit").hidden = true;
+    var who = localStorage.getItem(WHO_KEY) || "a";
+    $("exp-payer").value = who === "b" ? "b" : "a";
+  }
+
+  function startEditExpense(id) {
+    var expense = null;
+    state.current.expenses.forEach(function (item) { if (item.id === id) expense = item; });
+    if (!expense) return;
+    $("exp-amount").value = expense.amount;
+    $("exp-category").value = expense.category;
+    $("exp-payer").value = expense.payer;
+    $("exp-date").value = expense.date;
+    $("exp-note").value = expense.note || "";
+    $("exp-edit-id").value = expense.id;
+    $("exp-expected-updated").value = expense.updatedAt || "";
+    $("exp-new-id").value = "";
+    $("btn-add-expense").textContent = "更新支出";
+    $("btn-cancel-edit").hidden = false;
+    $("exp-amount").focus();
+  }
+
+  function acceptState(next, opts) {
+    opts = opts || {};
+    var prevSig = signature(state);
+    var prevIds = expenseIdMap(state);
+    var hadData = !!state.setupDone;
+    applyState(next);
+    writeCache();
+    var same = signature(state) === prevSig;
+    if (!same || !hadData) renderAll();
+    setConnected(true);
+    setSync("ok", "已連線 Google Sheet · 修訂 " + (state.revision || 0));
+    if (opts.announce && hadData && !same) {
+      var added = (state.current.expenses || []).filter(function (e) { return !prevIds[e.id]; });
+      if (added.length === 1) {
+        toast("已同步帳單：" + personName(added[0].payer) + " " + money(added[0].amount) + (added[0].note ? " " + added[0].note : ""));
+      } else if (added.length > 1) {
+        toast("已同步另一位新增的 " + added.length + " 筆帳單");
+      } else {
+        var removed = Object.keys(prevIds).some(function (id) {
+          return !state.current.expenses.some(function (e) { return e.id === id; });
+        });
+        if (removed) toast("有帳單被修改或刪除，清單已更新");
+      }
+    }
+  }
+
+  function failWrite(err) {
+    var message = err && err.message ? err.message : "寫入失敗";
+    var offline = /連線失敗|連不上|Failed to fetch|NetworkError|Load failed|請用 Google Apps Script/.test(message);
+    if (offline) {
+      setConnected(false);
+      setSync("err", "暫時連不上 Google Sheet");
+    } else if (state.setupDone || state.spreadsheetUrl) {
+      setConnected(true);
+      setSync("ok", "已連線 Google Sheet · 修訂 " + (state.revision || 0));
+    } else {
+      setSync("err", "寫入失敗");
+    }
+    toast(message);
+  }
+
+  function startWrite() {
+    pullGen += 1;
+    saving += 1;
+    setSync("busy", "正在寫入 Google Sheet…");
+    return pullGen;
+  }
+
+  function endWrite(gen) {
+    saving = Math.max(0, saving - 1);
+    return gen === pullGen;
+  }
+
+  function pull(opts) {
+    opts = opts || {};
+    if (saving && opts.silent) return Promise.resolve(null);
+    var gen = pullGen;
+    return call("apiGetState").then(function (res) {
+      if (gen !== pullGen) return null;
+      if (!res || !res.ok) throw new Error((res && res.error) || "讀取失敗");
+      acceptState(res.state, opts);
+      return res.state;
+    }).catch(function (err) {
+      if (gen !== pullGen) return null;
+      setConnected(false);
+      setSync("err", "暫時連不上 Google Sheet");
+      var errorText = $("error-text");
+      if (errorText) errorText.textContent = err.message || "讀取失敗";
+      if (!state.setupDone) showScreen("screen-error");
+      if (!opts.silent) toast(err.message || "讀取失敗");
+      return null;
+    });
+  }
+
+  function commitField(field) {
+    if (!state.current || !state.current.id) return;
+    var raw = parseFloat($(field).value);
+    var payload = { monthId: state.current.id };
+    payload[field] = isFinite(raw) && raw >= 0 ? round2(raw) : 0;
+    var gen = startWrite();
+    call("apiPatchMonth", payload).then(function (res) {
+      if (!endWrite(gen)) return;
+      if (!res || !res.ok) throw new Error((res && res.error) || "無法儲存");
+      acceptState(res.state);
+    }).catch(function (err) {
+      if (!endWrite(gen)) return;
+      failWrite(err);
+    });
+  }
+
+  function submitExpense(event) {
+    event.preventDefault();
+    var amount = parseFloat($("exp-amount").value);
+    if (!isFinite(amount) || amount <= 0) {
+      toast("請輸入有效金額");
+      return;
+    }
+    var editId = $("exp-edit-id").value;
+    var id = editId || $("exp-new-id").value || uid();
+    if (!editId) $("exp-new-id").value = id;
+    var payload = {
+      id: id,
+      amount: round2(amount),
+      category: $("exp-category").value,
+      payer: $("exp-payer").value,
+      date: $("exp-date").value || todayISO(),
+      note: $("exp-note").value.trim()
+    };
+    if (editId) payload.expectedUpdatedAt = $("exp-expected-updated").value;
+    $("btn-add-expense").disabled = true;
+    var gen = startWrite();
+    call("apiUpsertExpense", payload).then(function (res) {
+      var current = endWrite(gen);
+      $("btn-add-expense").disabled = false;
+      if (!current) return;
+      if (!res || !res.ok) throw new Error((res && res.error) || "無法儲存帳單");
+      acceptState(res.state);
+      if (res.conflict) {
+        resetExpenseForm();
+        toast("這筆帳剛剛被另一位改過，已改載入最新內容");
+        return;
+      }
+      resetExpenseForm();
+      toast(editId ? "支出已更新" : "已加入支出");
+    }).catch(function (err) {
+      endWrite(gen);
+      $("btn-add-expense").disabled = false;
+      failWrite(err);
+    });
+  }
+
+  function deleteExpense(id) {
+    if (!confirm("確定刪除此筆支出？試算表會保留這一列並標成已刪除。")) return;
+    var gen = startWrite();
+    call("apiDeleteExpense", { id: id }).then(function (res) {
+      if (!endWrite(gen)) return;
+      if (!res || !res.ok) throw new Error((res && res.error) || "無法刪除");
+      if ($("exp-edit-id").value === id) resetExpenseForm();
+      acceptState(res.state);
+      toast("已刪除支出");
+    }).catch(function (err) {
+      if (!endWrite(gen)) return;
+      failWrite(err);
+    });
+  }
+
+  function buildSettleHtml(summary) {
+    return "<p>即將結算 <strong>" + escapeHtml(state.current.label) + "</strong>，並開啟新月份。若另一位同時按結算，只會成功一次。</p>" +
+      '<div class="settle-result"><h3>結算結果</h3>' +
+      "<p>家庭總收入：" + escapeHtml(money(summary.income)) + "</p>" +
+      "<p>總支出：" + escapeHtml(money(summary.totalSpent)) + "</p>" +
+      "<p>本月淨收支（收入 − 支出）：<strong>" + escapeHtml(money(summary.net)) + "</strong></p>" +
+      "<p>夾錢剩餘：" + escapeHtml(money(summary.poolRemain)) + "</p>" +
+      "<p><strong>" + escapeHtml(settlementText(summary)) + "</strong></p>" +
+      "<p style='margin-top:0.6rem;font-size:0.85rem;'>" +
+      escapeHtml(state.people[0].name) + " 支出 " + escapeHtml(money(summary.spentA)) +
+      " · " + escapeHtml(state.people[1].name) + " 支出 " + escapeHtml(money(summary.spentB)) +
+      "</p></div>";
+  }
+
+  function openSettleModal() {
+    $("settle-modal-body").innerHTML = buildSettleHtml(computeSummary());
+    openModal("modal-settle");
+  }
+
+  function confirmSettle() {
+    var monthId = state.current.id;
+    $("btn-confirm-settle").disabled = true;
+    var gen = startWrite();
+    call("apiSettle", { monthId: monthId }).then(function (res) {
+      var current = endWrite(gen);
+      $("btn-confirm-settle").disabled = false;
+      if (!current) return;
+      if (!res || !res.ok) throw new Error((res && res.error) || "無法結算");
+      closeModal("modal-settle");
+      acceptState(res.state);
+      resetExpenseForm();
+      toast("已結算 " + res.settledLabel + "，新月份 " + res.nextLabel + " 開始");
+    }).catch(function (err) {
+      endWrite(gen);
+      $("btn-confirm-settle").disabled = false;
+      closeModal("modal-settle");
+      pull({ silent: true });
+      failWrite(err);
+    });
+  }
+
+  function stateToXml(s) {
+    function expenseXml(e) {
+      return '      <expense id="' + xmlEscape(e.id) + '" amount="' + xmlEscape(e.amount) +
+        '" date="' + xmlEscape(e.date) + '" category="' + xmlEscape(e.category) +
+        '" payer="' + xmlEscape(e.payer) + '" note="' + xmlEscape(e.note || "") + '"/>';
+    }
+    function monthXml(m, tag) {
+      var lines = [];
+      lines.push("  <" + tag + ' id="' + xmlEscape(m.id) + '" label="' + xmlEscape(m.label) +
+        '" income="' + xmlEscape(m.income || 0) + '" pool="' + xmlEscape(m.pool || 0) +
+        '" settledAt="' + xmlEscape(m.settledAt || "") + '">');
+      lines.push("    <expenses>");
+      (m.expenses || []).forEach(function (e) { lines.push(expenseXml(e)); });
+      lines.push("    </expenses>");
+      if (m.settlement) lines.push('    <settlement json="' + xmlEscape(JSON.stringify(m.settlement)) + '"/>');
+      lines.push("  </" + tag + ">");
+      return lines.join("\n");
+    }
+    var people = (s.people || []).map(function (p) {
+      return '    <person id="' + xmlEscape(p.id) + '" name="' + xmlEscape(p.name) + '"/>';
+    }).join("\n");
+    var history = (s.history || []).map(function (m) { return monthXml(m, "month"); }).join("\n");
+    return '<?xml version="1.0" encoding="UTF-8"?>\n' +
+      '<homesplit setupDone="' + (s.setupDone ? "true" : "false") +
+      '" kittyName="' + xmlEscape(s.kittyName || "") +
+      '" currency="' + xmlEscape(s.currency || "HKD") +
+      '" updatedAt="' + xmlEscape(s.updatedAt || "") + '">\n' +
+      "  <people>\n" + people + "\n  </people>\n" +
+      monthXml(s.current, "current") + "\n  <history>\n" + (history || "") + "\n  </history>\n</homesplit>\n";
+  }
+
+  function xmlToState(xmlText) {
+    var doc = new DOMParser().parseFromString(xmlText, "application/xml");
+    if (doc.querySelector("parsererror")) throw new Error("XML 格式錯誤");
+    var root = doc.documentElement;
+    function attr(el, name, fallback) {
+      if (!el || !el.getAttribute) return fallback;
+      var v = el.getAttribute(name);
+      return v == null || v === "" ? fallback : v;
+    }
+    function parseMonth(el) {
+      if (!el) return emptyMonth();
+      var expenses = [];
+      Array.prototype.forEach.call(el.querySelectorAll("expenses expense"), function (node) {
+        expenses.push({
+          id: attr(node, "id", uid()),
+          amount: parseFloat(attr(node, "amount", "0")) || 0,
+          date: attr(node, "date", todayISO()),
+          category: attr(node, "category", "其他"),
+          payer: attr(node, "payer", "a"),
+          note: attr(node, "note", "")
+        });
+      });
+      var settlement = null;
+      var setEl = el.querySelector("settlement");
+      if (setEl && attr(setEl, "json")) {
+        try { settlement = JSON.parse(attr(setEl, "json")); } catch (err) { settlement = null; }
+      }
+      return {
+        id: attr(el, "id", uid()),
+        label: attr(el, "label", ""),
+        income: parseFloat(attr(el, "income", "0")) || 0,
+        pool: parseFloat(attr(el, "pool", "0")) || 0,
+        expenses: expenses,
+        settlement: settlement,
+        settledAt: attr(el, "settledAt", null)
+      };
+    }
+    var people = [];
+    Array.prototype.forEach.call(root.querySelectorAll("people person"), function (p) {
+      people.push({ id: attr(p, "id", "a"), name: attr(p, "name", "") });
+    });
+    var history = [];
+    Array.prototype.forEach.call(root.querySelectorAll("history > month"), function (m) {
+      history.push(parseMonth(m));
+    });
+    return {
+      setupDone: attr(root, "setupDone", "false") === "true",
+      kittyName: attr(root, "kittyName", "家庭收支"),
+      currency: attr(root, "currency", "HKD"),
+      people: people.length >= 2 ? people : emptyState().people,
+      current: parseMonth(root.querySelector("current")),
+      history: history,
+      updatedAt: attr(root, "updatedAt", "")
+    };
+  }
+
+  function exportPayload() {
+    var copy = JSON.parse(JSON.stringify(state));
+    delete copy.theme;
+    delete copy.spreadsheetUrl;
+    delete copy.detailUrl;
+    return copy;
+  }
+
+  function exportJSON() {
+    downloadBlob("homesplit-" + (state.current.label || "data") + ".json", JSON.stringify(exportPayload(), null, 2), "application/json;charset=utf-8");
+    toast("已匯出 JSON");
+  }
+
+  function exportXML() {
+    downloadBlob("homesplit-" + (state.current.label || "data") + ".xml", stateToXml(exportPayload()), "application/xml;charset=utf-8");
+    toast("已匯出 XML");
+  }
+
+  function exportTXT() {
+    var s = computeSummary();
+    var lines = [];
+    lines.push("HomeSplit 明細");
+    lines.push("====================");
+    lines.push("Kitty：" + state.kittyName);
+    lines.push("月份：" + state.current.label);
+    lines.push("貨幣：" + state.currency);
+    lines.push("參與者：" + state.people[0].name + "、" + state.people[1].name);
+    lines.push("");
+    lines.push("家庭總收入：" + money(s.income));
+    lines.push("共同夾錢：" + money(s.pool));
+    lines.push("夾錢剩餘：" + money(s.poolRemain));
+    lines.push("總支出：" + money(s.totalSpent));
+    lines.push("本月淨收支：" + money(s.net));
+    lines.push("");
+    lines.push(state.people[0].name + " 總支出：" + money(s.spentA));
+    lines.push(state.people[1].name + " 總支出：" + money(s.spentB));
+    lines.push("每人應負擔：" + money(s.fairShare));
+    lines.push("結算：" + settlementText(s));
+    lines.push("");
+    lines.push("—— 分類 ——");
+    CATEGORIES.forEach(function (c) { lines.push(c + "：" + money(s.byCat[c] || 0)); });
+    lines.push("");
+    lines.push("—— 支出明細 ——");
+    if (!state.current.expenses.length) lines.push("（無）");
+    state.current.expenses.slice().sort(function (a, b) { return a.date < b.date ? -1 : 1; }).forEach(function (e, i) {
+      lines.push((i + 1) + ". [" + e.date + "] " + money(e.amount) + " · " + e.category + " · " + personName(e.payer) + (e.note ? " — " + e.note : ""));
+    });
+    lines.push("");
+    lines.push("匯出時間：" + new Date().toLocaleString("zh-Hant"));
+    downloadBlob("homesplit-detail-" + (state.current.label || "data") + ".txt", lines.join("\n"), "text/plain;charset=utf-8");
+    toast("已下載明細");
+  }
+
+  function importFile(file) {
+    var reader = new FileReader();
+    reader.onload = function () {
+      try {
+        var text = String(reader.result || "");
+        var data;
+        var name = (file.name || "").toLowerCase();
+        if (name.indexOf(".xml") !== -1 || text.trim().charAt(0) === "<") data = xmlToState(text);
+        else data = JSON.parse(text);
+        if (!data || !data.current || !Array.isArray(data.people)) throw new Error("缺少必要欄位（people / current）");
+        if (!confirm("匯入會覆蓋試算表上的家庭紀錄，確定繼續？")) return;
+        var gen = startWrite();
+        call("apiImport", data).then(function (res) {
+          if (!endWrite(gen)) return;
+          if (!res || !res.ok) throw new Error((res && res.error) || "匯入失敗");
+          acceptState(res.state);
+          resetExpenseForm();
+          closeModal("modal-data");
+          toast("已還原到 Google 試算表");
+        }).catch(function (err) {
+          if (!endWrite(gen)) return;
+          failWrite(err);
+        });
+      } catch (err) {
+        toast("匯入失敗：" + (err.message || "無法解析檔案"));
+      }
+    };
+    reader.readAsText(file, "utf-8");
+  }
+
+  function clearAllData() {
+    if (!confirm("確定清除試算表上的所有 HomeSplit 紀錄？")) return;
+    if (!confirm("再次確認：支出、月份與明細都會清掉。")) return;
+    var gen = startWrite();
+    call("apiClearAll").then(function (res) {
+      if (!endWrite(gen)) return;
+      if (!res || !res.ok) throw new Error((res && res.error) || "無法清除");
+      acceptState(res.state);
+      resetExpenseForm();
+      closeModal("modal-data");
+      toast("已清除試算表紀錄");
+    }).catch(function (err) {
+      if (!endWrite(gen)) return;
+      failWrite(err);
+    });
+  }
+
+  function printSummary() {
+    var s = computeSummary();
+    $("print-title").textContent = state.kittyName + " — " + state.current.label + " 明細";
+    $("print-body").innerHTML =
+      "<p>貨幣：" + escapeHtml(state.currency) + "｜參與者：" + escapeHtml(state.people[0].name) + "、" +
+      escapeHtml(state.people[1].name) + "</p>" +
+      '<div class="card"><p>家庭總收入：' + escapeHtml(money(s.income)) + "</p>" +
+      "<p>總支出：" + escapeHtml(money(s.totalSpent)) + "</p>" +
+      "<p>本月淨收支：" + escapeHtml(money(s.net)) + "</p>" +
+      "<p>夾錢：" + escapeHtml(money(s.pool)) + "（剩餘 " + escapeHtml(money(s.poolRemain)) + "）</p>" +
+      "<p><strong>" + escapeHtml(settlementText(s)) + "</strong></p></div>" +
+      '<div class="card" style="margin-top:1rem;"><h3>分類</h3>' +
+      CATEGORIES.map(function (c) { return "<p>" + escapeHtml(c) + "：" + escapeHtml(money(s.byCat[c] || 0)) + "</p>"; }).join("") +
+      "</div>" +
+      '<div class="card" style="margin-top:1rem;"><h3>支出明細</h3>' + expenseLines(state.current.expenses) + "</div>";
+    window.print();
+  }
+
+  function openHistoryDetail(id) {
+    var month = null;
+    state.history.forEach(function (item) { if (item.id === id) month = item; });
+    if (!month) return;
+    var s = displaySummary(month);
+    $("history-detail-title").textContent = month.label + " 明細";
+    $("history-detail-body").innerHTML =
+      "<p>月份 <strong>" + escapeHtml(month.label) + "</strong>" +
+      (month.settledAt ? " · 結算於 " + escapeHtml(String(month.settledAt).slice(0, 10)) : "") +
+      " · " + (month.expenses ? month.expenses.length : 0) + " 筆支出</p>" +
+      '<div class="settle-result"><h3>結算結果</h3>' +
+      "<p>家庭總收入：" + escapeHtml(money(s.income)) + "</p>" +
+      "<p>總支出：" + escapeHtml(money(s.totalSpent)) + "</p>" +
+      "<p>本月淨收支：<strong>" + escapeHtml(money(s.net)) + "</strong></p>" +
+      "<p>夾錢剩餘：" + escapeHtml(money(s.poolRemain)) + "</p>" +
+      "<p><strong>" + escapeHtml(settlementText(s)) + "</strong></p></div>" +
+      "<h3 style='margin:1rem 0 0;font-size:1rem;'>支出明細</h3>" +
+      expenseLines(month.expenses);
+    openModal("modal-history-detail");
+  }
+
+  function bindEvents() {
+    $("form-setup").addEventListener("submit", function (event) {
+      event.preventDefault();
+      var payload = {
+        kittyName: $("kitty-name").value.trim() || "家庭收支",
+        currency: $("currency").value,
+        personA: $("person-a").value.trim() || "你",
+        personB: $("person-b").value.trim() || "另一半"
+      };
+      var gen = startWrite();
+      call("apiSetup", payload).then(function (res) {
+        if (!endWrite(gen)) return;
+        if (!res || !res.ok) throw new Error((res && res.error) || "無法建立");
+        acceptState(res.state);
+        resetExpenseForm();
+        toast("「" + state.kittyName + "」已寫入 Google 試算表");
+      }).catch(function (err) {
+        if (!endWrite(gen)) return;
+        failWrite(err);
+      });
+    });
+
+    ["income", "pool"].forEach(function (id) {
+      $(id).addEventListener("change", function () { commitField(id); });
+    });
+
+    $("form-expense").addEventListener("submit", submitExpense);
+    $("btn-cancel-edit").addEventListener("click", resetExpenseForm);
+    $("expense-list").addEventListener("click", function (event) {
+      var btn = event.target.closest("[data-action]");
+      if (!btn) return;
+      var item = btn.closest(".expense-item");
+      if (!item) return;
+      var id = item.getAttribute("data-id");
+      if (btn.getAttribute("data-action") === "edit") startEditExpense(id);
+      if (btn.getAttribute("data-action") === "delete") deleteExpense(id);
+    });
+    $("filter-payer").addEventListener("change", renderExpenseList);
+
+    $("btn-theme").addEventListener("click", function () {
+      localStorage.setItem(THEME_KEY, state.theme === "dark" ? "light" : "dark");
+      applyTheme();
+    });
+    ["link-sheet-header", "link-sheet", "link-detail"].forEach(function (id) {
+      bindPreviewSheetLink($(id));
+    });
+    $("who-am-i").addEventListener("change", function () {
+      localStorage.setItem(WHO_KEY, this.value === "b" ? "b" : "a");
+      if (!$("exp-edit-id").value) $("exp-payer").value = this.value;
+    });
+    $("btn-refresh").addEventListener("click", function () { pull({ silent: false, announce: true }); });
+    $("btn-retry").addEventListener("click", function () { pull({ silent: false }); });
+    $("btn-data").addEventListener("click", function () { updateSheetLinks(); openModal("modal-data"); });
+    $("btn-reload").addEventListener("click", function () { pull({ silent: false, announce: true }); });
+    $("btn-history").addEventListener("click", function () { renderHistory(); showScreen("screen-history"); });
+    $("btn-back-dash").addEventListener("click", function () { showScreen("screen-dash"); });
+
+    $("btn-edit-kitty").addEventListener("click", function () {
+      $("edit-name").value = state.kittyName;
+      $("edit-currency").value = state.currency;
+      $("edit-person-a").value = state.people[0].name;
+      $("edit-person-b").value = state.people[1].name;
+      openModal("modal-edit-kitty");
+    });
+    $("form-edit-kitty").addEventListener("submit", function (event) {
+      event.preventDefault();
+      var payload = {
+        kittyName: $("edit-name").value.trim() || "家庭收支",
+        currency: $("edit-currency").value,
+        personA: $("edit-person-a").value.trim() || "你",
+        personB: $("edit-person-b").value.trim() || "另一半"
+      };
+      var gen = startWrite();
+      call("apiUpdateKitty", payload).then(function (res) {
+        if (!endWrite(gen)) return;
+        if (!res || !res.ok) throw new Error((res && res.error) || "無法儲存設定");
+        closeModal("modal-edit-kitty");
+        acceptState(res.state);
+        toast("設定已更新");
+      }).catch(function (err) {
+        if (!endWrite(gen)) return;
+        failWrite(err);
+      });
+    });
+
+    $("btn-settle").addEventListener("click", openSettleModal);
+    $("btn-open-settle").addEventListener("click", openSettleModal);
+    $("btn-confirm-settle").addEventListener("click", confirmSettle);
+    $("btn-print-summary").addEventListener("click", printSummary);
+    $("btn-export-json").addEventListener("click", exportJSON);
+    $("btn-export-xml").addEventListener("click", exportXML);
+    $("btn-export-txt").addEventListener("click", exportTXT);
+    $("btn-import-json").addEventListener("click", function () { $("import-file").click(); });
+    $("import-file").addEventListener("change", function () {
+      var file = this.files && this.files[0];
+      if (file) importFile(file);
+      this.value = "";
+    });
+    $("btn-clear-all").addEventListener("click", clearAllData);
+
+    $("history-list").addEventListener("click", function (event) {
+      var btn = event.target.closest('[data-action="view-history"]');
+      if (!btn) return;
+      var item = btn.closest(".history-item");
+      if (item) openHistoryDetail(item.getAttribute("data-id"));
+    });
+
+    document.querySelectorAll("[data-close]").forEach(function (btn) {
+      btn.addEventListener("click", function () { closeModal(btn.getAttribute("data-close")); });
+    });
+    document.querySelectorAll(".modal-backdrop").forEach(function (backdrop) {
+      backdrop.addEventListener("click", function (event) {
+        if (event.target === backdrop) backdrop.classList.remove("open");
+      });
+    });
+    document.addEventListener("keydown", function (event) {
+      if (event.key !== "Escape") return;
+      document.querySelectorAll(".modal-backdrop.open").forEach(function (modal) { modal.classList.remove("open"); });
+    });
+    document.addEventListener("visibilitychange", function () {
+      if (!document.hidden) pull({ silent: true, announce: true });
+    });
+  }
+
+  function init() {
+    applyTheme();
+    bindEvents();
+    var who = localStorage.getItem(WHO_KEY);
+    if (who === "a" || who === "b") $("who-am-i").value = who;
+    $("exp-date").value = todayISO();
+    var cache = readCache();
+    if (cache && cache.current) {
+      applyState(cache);
+      renderAll();
+      setSync("busy", "正在核對 Google Sheet…");
+    } else {
+      showScreen("screen-loading");
+      setSync("busy", "正在連接 Google Sheet…");
+    }
+    pull({ silent: true }).then(function () {
+      var dirty = $("exp-amount").value || $("exp-note").value || $("exp-edit-id").value;
+      if (state.setupDone && !dirty) resetExpenseForm();
+    });
+    pollTimer = setInterval(function () {
+      if (document.hidden || saving) return;
+      pull({ silent: true, announce: true });
+    }, POLL_MS);
+  }
+
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
+  else init();
+})();
+</script>

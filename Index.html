@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="HomeSplit — 家庭收支。兩人同時記帳，紀錄寫入同一個 Google 試算表。" />
+  <meta name="theme-color" content="#0d9488" />
+  <title>HomeSplit — 家庭收支</title>
+  <?!= include('Styles'); ?>
+</head>
+<body class="is-offline">
+  <header class="app-header" role="banner">
+    <div class="brand" aria-label="HomeSplit">
+      <div class="brand-mark" aria-hidden="true">H</div>
+      <span class="brand-text">HomeSplit</span>
+    </div>
+    <div class="header-actions">
+      <span class="sync-pill" id="sync-status" title="Google 試算表同步狀態">
+        <span class="dot" aria-hidden="true"></span>
+        <span id="sync-status-text">正在連接</span>
+      </span>
+      <label class="who-label no-print" for="who-am-i">我是
+        <select class="select" id="who-am-i">
+          <option value="a">你</option>
+          <option value="b">另一半</option>
+        </select>
+      </label>
+      <button type="button" class="btn-icon" id="btn-theme" title="切換淺色／深色模式" aria-label="切換淺色／深色模式">◐</button>
+      <a class="btn btn-ghost btn-sm no-print" id="link-sheet-header" href="#" target="_blank" rel="noopener" hidden>試算表</a>
+      <button type="button" class="btn btn-ghost btn-sm no-print" id="btn-refresh">重新整理</button>
+      <button type="button" class="btn btn-ghost btn-sm no-print" id="btn-data">資料</button>
+      <button type="button" class="btn btn-ghost btn-sm no-print" id="btn-history" hidden>歷史</button>
+    </div>
+  </header>
+
+  <main>
+    <section id="screen-loading" class="screen active" aria-live="polite">
+      <div class="hero-setup">
+        <div class="card setup-card">
+          <h1>正在連接 Google Sheet</h1>
+          <p class="lead">正在讀取同一個家庭試算表裡的帳單與明細。</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="screen-error" class="screen" aria-labelledby="error-heading">
+      <div class="hero-setup">
+        <div class="card setup-card">
+          <h1 id="error-heading">連不上試算表</h1>
+          <p class="lead" id="error-text">請確認網頁應用程式已授權試算表，然後再試一次。</p>
+          <button type="button" class="btn btn-primary btn-lg btn-block" id="btn-retry">重試</button>
+        </div>
+      </div>
+    </section>
+
+    <section id="screen-setup" class="screen" aria-labelledby="setup-heading">
+      <div class="hero-setup">
+        <div class="card setup-card">
+          <h1 id="setup-heading">建立家庭收支</h1>
+          <p class="lead">兩人用同一個網址記帳。每一筆帳單各寫一列到 Google 試算表，可以同時輸入。</p>
+          <form id="form-setup" class="needs-server" autocomplete="on">
+            <div class="form-grid" style="margin-bottom: 0.9rem;">
+              <div class="field span-2">
+                <label for="kitty-name">活動／Kitty 名稱</label>
+                <input class="input" id="kitty-name" name="kittyName" type="text" value="家庭收支" maxlength="60" required />
+              </div>
+              <div class="field span-2">
+                <label for="currency">本國貨幣</label>
+                <select class="select" id="currency" name="currency">
+                  <option value="HKD" selected>HKD — 港幣</option>
+                  <option value="TWD">TWD — 新台幣</option>
+                  <option value="CNY">CNY — 人民幣</option>
+                  <option value="USD">USD — 美元</option>
+                  <option value="EUR">EUR — 歐元</option>
+                  <option value="JPY">JPY — 日圓</option>
+                </select>
+              </div>
+            </div>
+            <p class="section-label">兩位參與者</p>
+            <div class="participant-row" style="margin-bottom: 1.25rem;">
+              <div class="field">
+                <label for="person-a">你</label>
+                <input class="input" id="person-a" name="personA" type="text" value="你" maxlength="30" required />
+              </div>
+              <div class="field">
+                <label for="person-b">另一半</label>
+                <input class="input" id="person-b" name="personB" type="text" value="另一半" maxlength="30" required />
+              </div>
+            </div>
+            <button type="submit" class="btn btn-primary btn-lg btn-block">開始使用</button>
+            <p class="hint" style="margin-top: 0.85rem; text-align: center;">
+              紀錄只放在一個 Google 試算表・明細工作表會自動更新
+            </p>
+          </form>
+        </div>
+      </div>
+    </section>
+
+    <section id="screen-dash" class="screen" aria-labelledby="dash-heading">
+      <div class="container">
+        <div class="dash-top">
+          <div>
+            <h1 class="kitty-title" id="dash-heading">家庭收支</h1>
+            <div class="kitty-meta">
+              <span class="pill primary" id="pill-month">—</span>
+              <span class="pill" id="pill-currency">HKD</span>
+              <span class="pill" id="pill-people">你 · 另一半</span>
+            </div>
+            <p class="hint" style="margin:0.55rem 0 0;">兩人可同時輸入。每筆帳單獨立寫入試算表，約每 8 秒對一次最新明細。</p>
+          </div>
+          <div class="toolbar-right no-print">
+            <button type="button" class="btn btn-secondary btn-sm needs-server" id="btn-edit-kitty">編輯設定</button>
+            <button type="button" class="btn btn-primary needs-server" id="btn-open-settle">Settle 結算</button>
+          </div>
+        </div>
+
+        <div class="dash-grid">
+          <div class="stack">
+            <div class="card">
+              <h2 class="card-title">收入與夾錢</h2>
+              <p class="card-sub">輸入本月家庭總收入與共同夾錢。兩個欄位分開儲存，不會互相覆蓋。</p>
+              <div class="form-grid">
+                <div class="field">
+                  <label for="income">本月家庭總收入</label>
+                  <input class="input needs-server" id="income" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0.00" />
+                </div>
+                <div class="field">
+                  <label for="pool">共同夾錢金額</label>
+                  <input class="input needs-server" id="pool" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0.00" />
+                </div>
+              </div>
+            </div>
+
+            <div class="card">
+              <h2 class="card-title">新增支出</h2>
+              <p class="card-sub">各自選自己的付款人。分類為膳食、日常用品、月費、其他。</p>
+              <form id="form-expense" class="needs-server">
+                <div class="form-grid cols-4">
+                  <div class="field">
+                    <label for="exp-amount">金額 <span aria-hidden="true">*</span></label>
+                    <input class="input" id="exp-amount" type="number" min="0.01" step="0.01" inputmode="decimal" required placeholder="0.00" />
+                  </div>
+                  <div class="field">
+                    <label for="exp-category">分類</label>
+                    <select class="select" id="exp-category">
+                      <option value="膳食">膳食</option>
+                      <option value="日常用品">日常用品</option>
+                      <option value="月費">月費</option>
+                      <option value="其他">其他</option>
+                    </select>
+                  </div>
+                  <div class="field">
+                    <label for="exp-payer">付款人</label>
+                    <select class="select" id="exp-payer">
+                      <option value="a">你</option>
+                      <option value="b">另一半</option>
+                    </select>
+                  </div>
+                  <div class="field">
+                    <label for="exp-date">日期</label>
+                    <input class="input" id="exp-date" type="date" required />
+                  </div>
+                  <div class="field span-full">
+                    <label for="exp-note">說明（選填）</label>
+                    <input class="input" id="exp-note" type="text" maxlength="120" placeholder="例如：超市採買、電費…" />
+                  </div>
+                </div>
+                <div style="margin-top: 0.9rem;">
+                  <button type="submit" class="btn btn-primary" id="btn-add-expense">加入支出</button>
+                  <button type="button" class="btn btn-ghost" id="btn-cancel-edit" hidden>取消編輯</button>
+                </div>
+                <input type="hidden" id="exp-edit-id" value="" />
+                <input type="hidden" id="exp-expected-updated" value="" />
+                <input type="hidden" id="exp-new-id" value="" />
+              </form>
+            </div>
+
+            <div class="card">
+              <div class="toolbar">
+                <div>
+                  <h2 class="card-title" style="margin:0;">支出明細</h2>
+                  <p class="card-sub" style="margin:0.25rem 0 0;" id="expense-count">尚無支出</p>
+                </div>
+                <div class="toolbar-right">
+                  <label class="sr-only" for="filter-payer">篩選付款人</label>
+                  <select class="select" id="filter-payer" style="width:auto; min-width:120px;">
+                    <option value="all">全部</option>
+                    <option value="a">你</option>
+                    <option value="b">另一半</option>
+                  </select>
+                </div>
+              </div>
+              <div class="expense-list" id="expense-list" role="list"></div>
+            </div>
+          </div>
+
+          <aside class="stack" aria-label="即時摘要">
+            <div class="card">
+              <h2 class="card-title">即時計算</h2>
+              <p class="card-sub">支出、分類與應收應付會跟著試算表更新。</p>
+              <div class="stat-grid" id="stat-grid"></div>
+            </div>
+            <div class="card">
+              <h2 class="card-title">分類總支出</h2>
+              <div class="category-bars" id="category-bars"></div>
+            </div>
+            <div class="card settle-panel">
+              <h2 class="card-title">結算 Settle</h2>
+              <p class="card-sub">計算本月淨收支，並顯示誰應付款給誰。結算後開新月份，明細留在歷史。</p>
+              <div id="settle-preview" style="margin-bottom: 0.85rem;"></div>
+              <button type="button" class="btn btn-primary btn-lg btn-block needs-server" id="btn-settle">Settle（結算本月）</button>
+              <button type="button" class="btn btn-secondary btn-block" id="btn-print-summary" style="margin-top:0.5rem;">列印明細</button>
+            </div>
+          </aside>
+        </div>
+      </div>
+    </section>
+
+    <section id="screen-history" class="screen" aria-labelledby="history-heading">
+      <div class="container">
+        <div class="dash-top">
+          <div>
+            <h1 class="kitty-title" id="history-heading">歷史月份</h1>
+            <p class="card-sub" style="margin:0.35rem 0 0;">已結算的月份會保留收入、支出與每一筆明細。</p>
+          </div>
+          <button type="button" class="btn btn-secondary" id="btn-back-dash">返回本月</button>
+        </div>
+        <div class="card">
+          <div class="history-list" id="history-list"></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="screen-print" class="print-only" aria-hidden="true">
+      <div class="container">
+        <h1 id="print-title">HomeSplit 明細</h1>
+        <div id="print-body"></div>
+      </div>
+    </section>
+  </main>
+
+  <div class="modal-backdrop" id="modal-data" role="dialog" aria-modal="true" aria-labelledby="data-modal-title">
+    <div class="modal wide">
+      <div class="modal-header">
+        <h2 id="data-modal-title">資料與明細</h2>
+        <button type="button" class="btn-icon" data-close="modal-data" aria-label="關閉">✕</button>
+      </div>
+      <p class="card-sub">所有紀錄都在同一個 Google 試算表。支出一筆一列；「明細」工作表是給人看的結算與逐筆清單，每次寫入會重算。</p>
+      <div class="sheet-links">
+        <a id="link-sheet" href="#" target="_blank" rel="noopener">開啟試算表</a>
+        <a id="link-detail" href="#" target="_blank" rel="noopener">開啟明細工作表</a>
+      </div>
+      <p class="hint" id="sheet-updated">尚未連線。</p>
+      <div class="modal-actions" style="justify-content:flex-start;">
+        <button type="button" class="btn btn-secondary" id="btn-reload">立即重新讀取</button>
+      </div>
+      <hr class="divider" />
+      <p class="section-label">輸出明細</p>
+      <div class="stack" style="gap:0.65rem;">
+        <button type="button" class="btn btn-secondary btn-block" id="btn-export-txt">下載明細（TXT）</button>
+        <button type="button" class="btn btn-secondary btn-block" id="btn-export-json">匯出完整資料（JSON）</button>
+        <button type="button" class="btn btn-secondary btn-block" id="btn-export-xml">匯出完整資料（XML）</button>
+        <button type="button" class="btn btn-secondary btn-block needs-server" id="btn-import-json">匯入 JSON／XML 還原</button>
+        <input type="file" id="import-file" accept="application/json,.json,application/xml,.xml,text/xml" hidden />
+        <button type="button" class="btn btn-danger-soft btn-block needs-server" id="btn-clear-all">清除所有資料</button>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-ghost" data-close="modal-data">關閉</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" id="modal-edit-kitty" role="dialog" aria-modal="true" aria-labelledby="edit-kitty-title">
+    <div class="modal">
+      <div class="modal-header">
+        <h2 id="edit-kitty-title">編輯 Kitty 設定</h2>
+        <button type="button" class="btn-icon" data-close="modal-edit-kitty" aria-label="關閉">✕</button>
+      </div>
+      <form id="form-edit-kitty">
+        <div class="form-grid">
+          <div class="field span-2">
+            <label for="edit-name">名稱</label>
+            <input class="input" id="edit-name" type="text" maxlength="60" required />
+          </div>
+          <div class="field span-2">
+            <label for="edit-currency">貨幣</label>
+            <select class="select" id="edit-currency">
+              <option value="HKD">HKD — 港幣</option>
+              <option value="TWD">TWD — 新台幣</option>
+              <option value="CNY">CNY — 人民幣</option>
+              <option value="USD">USD — 美元</option>
+              <option value="EUR">EUR — 歐元</option>
+              <option value="JPY">JPY — 日圓</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="edit-person-a">參與者 A</label>
+            <input class="input" id="edit-person-a" type="text" maxlength="30" required />
+          </div>
+          <div class="field">
+            <label for="edit-person-b">參與者 B</label>
+            <input class="input" id="edit-person-b" type="text" maxlength="30" required />
+          </div>
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-ghost" data-close="modal-edit-kitty">取消</button>
+          <button type="submit" class="btn btn-primary">儲存</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" id="modal-settle" role="dialog" aria-modal="true" aria-labelledby="settle-modal-title">
+    <div class="modal">
+      <div class="modal-header">
+        <h2 id="settle-modal-title">確認結算</h2>
+        <button type="button" class="btn-icon" data-close="modal-settle" aria-label="關閉">✕</button>
+      </div>
+      <div id="settle-modal-body"></div>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-ghost" data-close="modal-settle">取消</button>
+        <button type="button" class="btn btn-primary" id="btn-confirm-settle">確認結算並開新月份</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" id="modal-history-detail" role="dialog" aria-modal="true" aria-labelledby="history-detail-title">
+    <div class="modal wide">
+      <div class="modal-header">
+        <h2 id="history-detail-title">月份明細</h2>
+        <button type="button" class="btn-icon" data-close="modal-history-detail" aria-label="關閉">✕</button>
+      </div>
+      <div id="history-detail-body"></div>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-ghost" data-close="modal-history-detail">關閉</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast-host" id="toast-host" aria-live="polite"></div>
+  <!--PREVIEW_SHIM-->
+  <?!= include('App'); ?>
+</body>
+</html>
