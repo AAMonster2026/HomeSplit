@@ -1,73 +1,64 @@
-# HomeSplit — 家庭收支平台
+# HomeSplit — 家庭收支（Google 試算表）
 
-單一 HTML 檔案的家庭收支／分帳工具，風格與操作參考 [KittySplit](https://www.kittysplit.com/)。  
-資料會同步寫入**本 GitHub 專案**的 JSON 與 XML，兩人開啟同一個網頁時會自動讀取最新紀錄。
+兩人用同一個網頁記帳。所有紀錄由 Google Apps Script 寫進**一個** Google 試算表，不再使用 GitHub 當資料庫。
 
-## 立即使用
+既有 Kitty「家庭收支」（Tong、Momo、夾錢 11000、2026-08 的 17 筆支出）會在試算表第一次建立時自動寫入。
 
-1. 啟用 GitHub Pages（Settings → Pages → Source = **GitHub Actions**），或用瀏覽器直接開啟 [`index.html`](./index.html)
-2. 網站網址（Pages 啟用後）：`https://aamonster2026.github.io/HomeSplit/`
-3. 兩人用**同一個網址**開啟即可自動載入 `data/homesplit.json`
+## 試算表裡有什麼
 
-本機 `localStorage` 仍會備份一份，離線時可繼續查看。
+同一個試算表有四個工作表：
 
-## 網路儲存（同一專案）
-
-建立兩人 Kitty 後，紀錄會寫入本倉庫：
-
-| 檔案 | 說明 |
+| 工作表 | 用途 |
 | --- | --- |
-| [`data/homesplit.json`](./data/homesplit.json) | 完整資料（程式讀寫的主檔） |
-| [`data/homesplit.xml`](./data/homesplit.xml) | 相同資料的 XML 鏡像 |
+| 設定 | 名稱、貨幣、兩位參與者、目前月份、修訂編號 |
+| 月份 | 進行中的月份，以及已結算月份的收入、夾錢、結算結果 |
+| 支出 | 一筆帳單一列。刪除只會把「已刪除」標成「是」，列還在 |
+| 明細 | 給人看的結算、分類與逐筆清單。每次寫入會重算，請不要手改 |
 
-- **讀取**：公開倉庫無需 Token。開啟網頁會自動抓最新 JSON（GitHub Pages 同源或 `raw.githubusercontent.com`）。
-- **寫入**：需要 Fine-grained Personal Access Token（只存在瀏覽器，**不會**寫進倉庫）。
+兩人同時各新增一筆時，程式會先鎖住試算表、讀出現有列、再補上自己的那一列。後寫入的人不會把先寫入的帳單整份蓋掉。若兩人同時改**同一筆**，後送出的一方會看到「這筆帳剛剛被另一位改過」，並載入最新內容。收入與夾錢是分開的欄位，改其中一個不會把另一個還原。
 
-### 建立 Token（建議 Fine-grained）
+## 用家功能
 
-1. GitHub → Settings → Developer settings → [Personal access tokens](https://github.com/settings/tokens)
-2. Fine-grained token → 只授權本倉庫 `AAMonster2026/HomeSplit`
-3. Repository permissions → **Contents: Read and write**
-4. 把 Token 貼到 HomeSplit 的「資料」或建立 Kitty 畫面（兩人都要貼，才能各自記帳並寫回）
+- 建立 Kitty：名稱、貨幣（HKD／TWD／CNY／USD／EUR／JPY）、兩位參與者
+- 收入與夾錢
+- 支出：金額、分類（膳食／日常用品／月費／其他）、付款人、日期、說明；可編輯、刪除、依付款人篩選
+- 右上角「我是」存在這台裝置，預設付款人是自己，方便兩人各用各的手機
+- 即時計算：每人支出、分類、夾錢剩餘、誰應付給誰
+- Settle：結算後開下一個月，歷史月份保留每一筆明細
+- 輸出明細：試算表的「明細」工作表、網頁列印、下載 TXT，以及 JSON／XML 備份
+- 淺色／深色模式（只存在自己的瀏覽器）
+- 約每 8 秒，以及回到這個分頁時，自動讀取對方剛輸入的帳單
 
-Token 權限請盡量縮小，不要勾選整個帳號的刪除權限。
+分帳方式與原本相同：每筆支出兩人各付一半。誰實際付得比較多，另一位就應付差額。夾錢剩餘 = 夾錢 − 總支出。
 
-## 兩人共用流程
+## 部署到 Google Apps Script
 
-1. 其中一人建立 Kitty，並填入 Token → 資料寫入 `data/*.json` 與 `data/*.xml`
-2. 另一人開啟同一 GitHub Pages 網址 → 自動讀到已建立的 Kitty 與支出
-3. 之後任一方新增／編輯支出，有 Token 的一方會把變更推回倉庫
-4. 另一人重新整理、切回分頁，或等待約 25–45 秒輪詢，即可看到更新
+1. 開啟 [script.google.com](https://script.google.com)，建立空白專案。
+2. 新增或覆蓋這些檔案（HTML 檔在編輯器裡的名稱不要加路徑）：
+   - `Code.gs`
+   - `SheetRepo.gs`
+   - `Index.html`（檔名 `Index`）
+   - `Styles.html`（檔名 `Styles`）
+   - `App.html`（檔名 `App`）
+   - 專案設定中的 `appsscript.json`（時區 `Asia/Hong_Kong`，執行階段 V8）
+3. 部署 → 新增部署 → 類型選「網頁應用程式」：
+   - **執行身分：我**（部署者）。這樣兩人都寫進你的那一個試算表。
+   - **存取權：任何人**（有 Google 帳戶）。若不想登入，改選「任何人，甚至匿名使用者」。
+4. 授權「查看及管理你的 Google 試算表」。
+5. 打開部署網址。第一次開啟會建立試算表「HomeSplit 家庭收支」，並寫入現有帳單。
+6. 把**同一個網址**交給另一位。各自在右上角選「我是」。
 
-## 主要功能
+試算表網址在網頁的「試算表」或「資料」裡。若要直接用 Google 試算表看明細，把該試算表分享給另一位即可；網頁寫入本身不需要這項分享。
 
-- **建立 Kitty**：名稱、貨幣（HKD／TWD／CNY／USD／EUR／JPY）、兩位參與者
-- **收入與夾錢**：本月家庭總收入、共同夾錢
-- **支出紀錄**：金額、說明、日期、分類（膳食／日常用品／月費／其他）、付款人；可編輯刪除
-- **即時計算**：每人總支出、分類總額、應收／應付、夾錢剩餘
-- **Settle 結算**：淨收支與誰應付給誰；結算後開新月份並保留歷史
-- **GitHub 同步**：JSON＋XML 存於同一 project；開啟網頁自動讀取
-- **本機備份**：匯出 JSON／XML／TXT、匯入還原、清除資料
-- **其他**：歷史月份、淺色／深色模式、列印摘要
+若腳本是綁在某個試算表上（擴充功能 → Apps Script），程式會使用那個試算表，不會另外開一個。試算表選單會多出「HomeSplit」：可重新產生明細，或在部署完成後顯示網頁網址。
 
-## 分帳邏輯
+## 本機檢查
 
-- 每筆支出視為共同負擔，兩人各付一半
-- 若 A 實際多付，則 B 應付差額給 A（反之亦然）
-- 夾錢剩餘 = 夾錢金額 − 總支出
+不連 Google 也可以先看輸入頁。預覽用的是記憶體裡的試算表，重新啟動就會回到最初的 17 筆。
 
-## 技術說明
-
-- 純 HTML + CSS + 原生 JavaScript，無框架、無後端伺服器
-- 以 [GitHub Contents API](https://docs.github.com/en/rest/repos/contents) 更新倉庫檔案
-- CSS 變數集中在 `:root`，方便調整主題
-
-## 檔案結構
-
+```bash
+node tools/test-store.js
+node tools/preview-server.js
 ```
-index.html                      # 完整應用（CSS／JS 皆內嵌）
-data/homesplit.json             # 網路同步主檔
-data/homesplit.xml              # 網路同步 XML 鏡像
-.github/workflows/pages.yml     # GitHub Pages 部署
-README.md
-```
+
+預覽網址是 `http://127.0.0.1:4173/`。正式紀錄仍要以部署後的 Apps Script 網頁寫入 Google 試算表。
